@@ -1,0 +1,21 @@
+.profit-page { color: var(--text-primary); min-width: 0; }
+.profit-period { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.profit-period select { min-height: 44px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-surface); color: var(--text-primary); padding: 8px 12px; font: inherit; }
+.profit-summary { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(15,23,42,.04); }
+.profit-result { padding: 18px; border-bottom: 1px solid var(--border-color); }
+.profit-result small { display: block; font-size: 14px; }
+.profit-result > strong { display: block; color: var(--accent-primary); font-size: clamp(24px,4vw,32px); margin-top: 6px; overflow-wrap: anywhere; }
+.profit-result p, .profit-explanation { color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin: 6px 0 0; }
+.profit-breakdown { margin: 0; padding: 8px 18px; }
+.profit-breakdown > div { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; font-size: 14px; }
+.profit-breakdown dt { color: var(--text-secondary); }
+.profit-breakdown dd { margin: 0; font-weight: 600; text-align: right; }
+.profit-explanation { padding: 0 18px 16px; }
+.profit-stock-note { margin: -6px 0 0; font-size: 13px; color: var(--text-secondary); }
+.profit-details { padding: 0 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-surface); }
+.profit-details > summary { padding: 16px 0; min-height: 44px; box-sizing: border-box; cursor: pointer; font-size: 14px; font-weight: 600; }
+.profit-details[open] { padding-bottom: 16px; }
+.profit-chart { height: 250px; min-width: 0; position: relative; }
+.profit-detail-note { color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+.profit-page button:focus-visible, .profit-page select:focus-visible, .profit-page summary:focus-visible { outline: 3px solid var(--accent-primary); outline-offset: 2px; }
+@media(max-width:520px) { .profit-breakdown > div { font-size: 13px; gap: 10px; } .profit-breakdown dd { min-width: 80px; overflow-wrap: anywhere; } .profit-chart { height: 220px; } .profit-period select { flex: 1; min-width: 0; } }

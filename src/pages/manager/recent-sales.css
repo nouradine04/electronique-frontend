@@ -1,0 +1,19 @@
+.manager-recent { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 3px 12px rgba(15,23,42,.04); overflow: hidden; }
+.manager-recent header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; background: var(--bg-main); }
+.manager-recent h2 { font-size: 17px; font-weight: 700; margin: 0; color: var(--text-primary); }
+.manager-recent header p { margin: 4px 0 0; font-size: 12px; color: var(--text-secondary); }
+.manager-recent header p strong { color: var(--accent-primary); }
+.manager-recent header button { display: flex; align-items: center; gap: 4px; min-height: 44px; border: 0; background: none; color: var(--accent-primary); font-size: 13px; font-weight: 600; cursor: pointer; }
+.manager-recent button:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.mr-sale { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 14px 16px; border-top: 1px solid var(--border-color); }
+.mr-product { min-width: 0; }
+.mr-product > strong { display: block; font-size: 14px; color: var(--text-primary); line-height: 1.4; overflow-wrap: anywhere; }
+.mr-product p { margin: 5px 0; font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.mr-product small { font-size: 12px; color: var(--text-muted); }
+.mr-product small span { margin: 0 5px; }
+.mr-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.mr-amount > strong { color: var(--text-primary); font-size: 14px; overflow-wrap: anywhere; }
+.mr-payment { background: var(--bg-main); color: var(--text-secondary); padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.mr-payment.credit { background: #ea580c; color: white; }
+.mr-empty { padding: 20px 16px; color: var(--text-secondary); font-size: 14px; }
+@media(max-width:480px) { .mr-sale { grid-template-columns: minmax(0,1fr); gap: 8px; } .mr-amount { flex-direction: row; align-items: center; justify-content: space-between; } }

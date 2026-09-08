@@ -1,0 +1,56 @@
+.owner-home { max-width: 1050px; margin: 0 auto; display: grid; gap: 20px; padding-bottom: 32px; color: var(--text-primary); }
+.owner-home h2 { margin: 0; font-size: 24px; overflow-wrap: anywhere; }
+.owner-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.owner-heading > div { min-width: 0; }
+.owner-notification { position: relative; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); }
+.owner-notification b { background: #ea580c; color: white; border-radius: 12px; padding: 2px 6px; font-size: 12px; }
+.owner-metric.owner-money { background: #0e6ba8; border-color: #0e6ba8; color: white; }
+.owner-metric.owner-money > svg, .owner-metric.owner-money small { color: white; }
+.owner-chart { position: relative; height: 280px; min-width: 0; padding: 0 16px 12px; }
+.owner-chart-heading { flex-wrap: wrap; gap: 8px; padding-right: 16px; }
+.owner-period { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+.owner-period select { min-height: 44px; font: inherit; padding: 8px; color: var(--text-primary); background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; }
+.owner-chart-caption { color: var(--text-secondary); font-size: 13px; margin: 0 18px 16px; }
+.owner-chart-values { margin: 0 18px 16px; font-size: 13px; }
+.owner-chart-values summary { cursor: pointer; padding: 12px 0; color: var(--accent-primary); }
+.owner-chart-values div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.owner-profit { padding: 18px; display: flex; align-items: center; gap: 12px; color: var(--text-primary); text-align: left; }
+.owner-profit > svg { color: var(--accent-primary); flex-shrink: 0; }
+.owner-profit span { flex: 1; min-width: 0; }
+.owner-profit small { display: block; margin-top: 5px; }
+@media (max-width: 600px) { .owner-notification > span { display: none; } .owner-chart { height: 230px; padding: 0 8px 12px; } .owner-period { margin: 0 18px 12px; } }
+.owner-home header p { margin: 6px 0 0; color: var(--text-secondary); }
+.owner-home button { font: inherit; cursor: pointer; }
+.owner-home button:focus-visible { outline: 3px solid var(--accent-primary); outline-offset: 3px; }
+.owner-actions, .owner-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.owner-actions button { min-height: 56px; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-surface); color: var(--text-primary); font-weight: 600; }
+.owner-actions .primary { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+.owner-metric { padding: 18px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-surface); text-align: left; color: var(--text-primary); min-width: 0; }
+.owner-metric > svg { color: var(--accent-primary); }
+.owner-metric p { margin: 12px 0 8px; font-size: 14px; }
+.owner-metric > strong { display: block; font-size: clamp(20px,2.5vw,26px); overflow-wrap: anywhere; }
+.owner-home small { color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.owner-metric small { display: block; margin-top: 8px; }
+.owner-panel { border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-surface); overflow: hidden; }
+.owner-panel h3 { font-size: 17px; margin: 0; padding: 18px; }
+.owner-row { display: flex; gap: 12px; align-items: center; width: 100%; padding: 16px 18px; border: 0; border-top: 1px solid var(--border-color); background: transparent; color: var(--text-primary); text-align: left; }
+.owner-row > svg { flex-shrink: 0; color: var(--accent-primary); }
+.owner-row span { flex: 1; min-width: 0; }
+.owner-empty { padding: 0 18px 18px; margin: 0; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; line-height: 1.6; }
+.owner-section-heading { display: flex; align-items: center; justify-content: space-between; }
+.owner-section-heading button { display: flex; align-items: center; gap: 6px; min-height: 44px; margin-right: 12px; padding: 8px; background: transparent; border: 0; color: var(--accent-primary); }
+.owner-sale { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; padding: 16px 18px; border-top: 1px solid var(--border-color); }
+.owner-sale strong { overflow-wrap: anywhere; }
+.owner-sale p { font-size: 13px; margin: 6px 0 2px; color: var(--text-secondary); }
+.owner-sale-amount { text-align: right; }
+.owner-sale-amount small { display: block; margin-top: 6px; }
+.owner-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.owner-daily-count { display: flex; align-items: center; gap: 8px; margin: -6px 0 0; font-size: 14px; color: var(--text-secondary); }
+.owner-daily-count strong { color: var(--accent-primary); font-size: 18px; }
+.owner-daily-count > svg { color: var(--accent-primary); }
+.owner-recent { box-shadow: 0 3px 12px rgba(15,23,42,0.05); }
+.owner-recent .owner-section-heading { background: var(--bg-main); }
+.owner-recent .owner-sale { padding: 13px 18px; }
+.owner-recent .owner-sale-amount .owner-payment { display: inline-block; padding: 3px 7px; border-radius: 4px; background: var(--bg-main); color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.owner-recent .owner-sale-amount .owner-payment.credit { background: #ea580c; color: white; }
+@media (max-width: 600px) { .owner-home { gap: 16px; } .owner-actions { grid-template-columns: repeat(2,minmax(0,1fr)); } .owner-actions .primary { grid-column: 1/-1; } .owner-actions button { flex-wrap: wrap; } .owner-metrics { grid-template-columns: 1fr; gap: 10px; } .owner-metric { padding: 16px; } .owner-metric > svg { float: right; } .owner-metric p { margin-top: 0; } .owner-sale { grid-template-columns: minmax(0,1fr); gap: 8px; } .owner-sale-amount { text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; } .owner-sale-amount small { margin: 0; } }
