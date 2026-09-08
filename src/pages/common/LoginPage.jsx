@@ -1,8 +1,10 @@
+import { Reveal } from '../../components/Reveal';
 import React, { useState } from 'react';
 import { Box, Lock, Mail, CheckCircle2 } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
 import { loginLocalUser } from '../../services/localAuth.js';
 import logoImg from '../../assets/logo.png';
+import './public-responsive.css';
 
 export function LoginPage({ onLoginSuccess, onNavigate }) {
   const { switchRole, switchShop } = useShop();
@@ -32,14 +34,14 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
   };
 
   return (
-    <div style={{
+    <div className="login-layout" style={{
       minHeight: '100vh',
       display: 'flex',
       backgroundColor: 'var(--bg-main)'
     }}>
       
       {/* Left Marketing Panel (Hidden on very small screens) */}
-      <div style={{
+      <div className="login-marketing" style={{
         flex: 1,
         backgroundColor: 'var(--accent-primary)',
         color: 'white',
@@ -94,20 +96,21 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
       </div>
 
       {/* Right Login Panel */}
-      <div style={{
+      <div className="login-form-panel" style={{
         flex: 1,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px'
       }}>
-        <div className="surface-panel" style={{
+        <Reveal className="login-reveal"><div className="surface-panel login-card" style={{
           width: '100%',
           maxWidth: '400px',
           padding: '40px',
           borderRadius: 'var(--radius-lg)'
         }}>
           
+          <div className="login-brand-mobile"><img src={logoImg} alt="NStock" /><span>Votre boutique, à portée de main.</span></div>
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
               Bienvenue
@@ -141,6 +144,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
                 <Mail size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="email"
+                  autoComplete="username"
                   className="input-field"
                   style={{ paddingLeft: '40px', height: '44px' }}
                   value={email}
@@ -159,6 +163,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
                 <Lock size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="password"
+                  autoComplete="current-password"
                   className="input-field"
                   style={{ paddingLeft: '40px', height: '44px' }}
                   value={password}
@@ -207,7 +212,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
 
           </form>
 
-        </div>
+        </div></Reveal>
       </div>
     </div>
   );

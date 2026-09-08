@@ -1,0 +1,13 @@
+.install-panel.install-designed { max-width: 700px; padding: 0; border: 0; background: transparent; }
+.install-choices { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+.install-choices button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 66px; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; font: inherit; font-size: 14px; }
+.install-choices button[aria-pressed=true] { color: #0e6ba8; border-color: #0e6ba8; box-shadow: inset 0 0 0 1px #0e6ba8; }
+.install-choices button:focus-visible { outline: 3px solid #0e6ba8; outline-offset: 3px; }
+.install-detail { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 18px; padding: 32px; }
+.install-symbol { display: inline-flex; padding: 14px; border-radius: 16px; background: rgba(14,107,168,.08); color: #0e6ba8; margin-bottom: 18px; }
+.install-detail h3 { font-size: 24px; letter-spacing: -.04em; margin: 0 0 10px; }
+.install-detail > small { color: var(--text-muted); font-size: 12px; }
+.install-detail p { max-width: 440px; margin: 16px auto; font-size: 14px; }
+.install-detail .btn { padding: 12px 24px; border-radius: 28px; min-height: 48px; margin-top: 6px; }
+.install-detail [role=status] { text-align: start; background: var(--bg-main); padding: 14px; border-radius: 10px; }
+@media(max-width:600px) { .install-detail { padding: 24px 18px; } .install-detail h3 { font-size: 22px; } .install-choices button { flex-direction: column; font-size: 12px; gap: 7px; } .install-detail .btn { width: 100%; justify-content: center; } }

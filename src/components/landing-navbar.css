@@ -1,0 +1,35 @@
+.public-nav { position: sticky; top: 0; z-index: 100; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); }
+.public-nav-inner { max-width: 1240px; margin: auto; padding: 0 28px; display: flex; align-items: center; gap: 28px; min-height: 96px; }
+.public-nav button { font: inherit; font-size: 14px; cursor: pointer; border: 0; background: transparent; color: var(--text-secondary); min-height: 44px; border-radius: 8px; }
+.public-nav button:focus-visible { outline: 2px solid #0e6ba8; outline-offset: 3px; }
+.public-nav button:hover { color: #0e6ba8; background: var(--bg-main); }
+.public-nav .public-brand { padding: 0; flex-shrink: 0; display: flex; align-items: center; }
+.public-brand img { width: clamp(96px, 9vw, 128px); height: 96px; object-fit: contain; }
+.public-desktop-links { display: flex; gap: 8px; margin-inline: auto; }
+.public-desktop-links button { padding: 0 12px; font-weight: 500; }
+.public-nav-actions { display: flex; align-items: center; gap: 12px; }
+.public-nav .public-login { color: var(--text-primary); font-weight: 600; padding: 0 14px; }
+.public-nav .public-create { padding: 0 18px; background: #0e6ba8; color: white; font-weight: 600; }
+.public-nav .public-create:hover { background: #09598e; color: white; }
+.public-nav .public-menu-toggle { display: none; width: 44px; align-items: center; justify-content: center; border: 1px solid var(--border-color); }
+.public-menu { padding: 8px 20px 20px; border-top: 1px solid var(--border-color); }
+.public-menu[hidden] { display: none; }
+.public-menu nav { display: grid; margin-bottom: 12px; }
+.public-menu nav button { text-align: start; padding: 0 12px; }
+.public-menu > button { width: 100%; }
+.public-preferences { display: flex; align-items: center; gap: 2px; }
+.public-preferences button { display: flex; align-items: center; gap: 6px; padding: 0 10px; min-height: 36px; font-size: 12px; }
+@media(min-width: 1001px) { .public-menu { display: none; } }
+.public-mobile-preferences { justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px; }
+.public-mobile-preferences button { min-height: 44px; }
+@media(max-width: 1100px) { .public-desktop-preferences { display: none; } }
+@media(max-width: 1000px) {
+  .public-desktop-links, .public-nav-actions > .public-create, .public-nav-actions > .public-login, .public-desktop-preferences { display: none; }
+  .public-nav .public-menu-toggle { display: flex; width: auto; gap: 8px; padding: 0 12px; border: 0; color: var(--text-primary); font-weight: 500; }
+  .public-nav-inner { justify-content: space-between; padding: 0 16px; gap: 12px; min-height: 72px; }
+  .public-brand img { width: clamp(88px, 24vw, 108px); height: 72px; }
+  .public-nav-actions { gap: 0; }
+  .public-menu { position: absolute; top: 100%; inset-inline: 0; background: var(--bg-surface); padding: 12px 20px 20px; box-shadow: 0 12px 18px rgba(15,23,42,.08); max-height: calc(100dvh - 72px); overflow-y: auto; }
+  .public-menu nav button { min-height: 48px; border-radius: 0; border-bottom: 1px solid var(--border-color); }
+  .public-menu > .public-login { margin-top: 8px; }
+}

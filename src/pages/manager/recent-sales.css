@@ -12,7 +12,7 @@
 .mr-product small { font-size: 12px; color: var(--text-muted); }
 .mr-product small span { margin: 0 5px; }
 .mr-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.mr-amount > strong { color: var(--text-primary); font-size: 14px; overflow-wrap: anywhere; }
+.mr-amount > strong { color: #0e6ba8; font-size: 14px; overflow-wrap: anywhere; }
 .mr-payment { background: var(--bg-main); color: var(--text-secondary); padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
 .mr-payment.credit { background: #ea580c; color: white; }
 .mr-empty { padding: 20px 16px; color: var(--text-secondary); font-size: 14px; }
