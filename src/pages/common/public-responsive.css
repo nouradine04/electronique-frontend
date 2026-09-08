@@ -56,3 +56,4 @@
  .login-form-panel { align-items: flex-start !important; padding-top: 24px !important; }
  .login-card { border: 1px solid var(--border-color); box-shadow: 0 12px 40px rgba(15,23,42,.04); border-radius: 20px !important; }
 }
+.installed-auth > .public-nav, .installed-auth > main, .installed-auth > footer { display: none; }

@@ -3,7 +3,7 @@
   "name": "NStock — Caisse et Stock",
   "short_name": "NStock",
   "lang": "fr",
-  "start_url": "/",
+  "start_url": "/?app=1",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",

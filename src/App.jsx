@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isInstalledApp } from './services/appMode';
 import { useQuery } from './db/useQuery.js';
 import { queryProducts, querySales, queryCategories, queryStockMovements } from './db/queries.js';
 import { ShopProvider, useShop } from './context/ShopContext.jsx';
@@ -36,7 +37,7 @@ function MainAppContent() {
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'dashboard'
   const [showAddModal, setShowAddModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState('landing'); // 'landing' | 'login' | 'register'
+  const [currentPage, setCurrentPage] = useState(() => isInstalledApp() ? 'login' : 'landing');
 
   // Initialize active tab based on role on mount
   React.useEffect(() => {
@@ -63,6 +64,7 @@ function MainAppContent() {
 
   const handleLogout = () => {
     logout();
+    setCurrentPage('login');
     setIsAuthenticated(false);
   };
 
@@ -78,13 +80,14 @@ function MainAppContent() {
   // Render Landing or Login Page if not signed in
   if (!isAuthenticated) {
     if (currentPage === 'login') {
-      return <LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={setCurrentPage} />;
+      return <LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={(page) => setCurrentPage(isInstalledApp() && page === 'landing' ? 'login' : page)} />;
     }
     return (
       <LandingPage 
         onLoginSuccess={handleLoginSuccess} 
         onNavigate={setCurrentPage} 
         initialView={currentPage === 'register' ? 'register' : 'landing'} 
+        appOnly={isInstalledApp()}
       />
     );
   }

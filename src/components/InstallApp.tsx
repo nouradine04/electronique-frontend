@@ -1,4 +1,5 @@
 import { Reveal } from './Reveal';
+import { getInstallPrompt, clearInstallPrompt } from '../services/installPrompt';
 import './install-app.css';
 import React, { useEffect, useState } from 'react';
 import { Download, Smartphone, Monitor, ArrowDownToLine } from 'lucide-react';
@@ -9,7 +10,7 @@ interface InstallPrompt extends Event {
 }
 
 export function InstallApp({ isRtl = false }: { isRtl?: boolean }) {
-  const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
+  const [prompt, setPrompt] = useState<InstallPrompt | null>(getInstallPrompt);
   const [selected, setSelected] = useState<'mobile' | 'desktop'>(() => /Android|iPhone|iPad|iPod/.test(navigator.userAgent) || navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent) ? 'mobile' : 'desktop');
   const [help, setHelp] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,7 +34,7 @@ export function InstallApp({ isRtl = false }: { isRtl?: boolean }) {
     setBusy(true);
     try { await prompt.prompt(); await prompt.userChoice; }
     catch { setHelp(true); }
-    finally { setPrompt(null); setBusy(false); }
+    finally { clearInstallPrompt(); setPrompt(null); setBusy(false); }
   }
 
   return <Reveal><div className="install-panel install-designed" dir={isRtl ? 'rtl' : 'ltr'}>

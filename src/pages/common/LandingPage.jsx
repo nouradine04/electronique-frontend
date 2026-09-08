@@ -108,7 +108,7 @@ function FaqItem({ question, answer }) {
   );
 }
 
-export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing' }) {
+export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing', appOnly = false }) {
   const { switchShop, switchRole } = useShop();
   const { i18n } = useTranslation();
   
@@ -201,7 +201,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
   };
 
   return (
-    <div style={{
+    <div className={appOnly ? "installed-auth" : undefined} style={{
       minHeight: '100vh',
       backgroundColor: 'var(--bg-main)',
       color: 'var(--text-primary)',
@@ -1016,7 +1016,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
         }}>
           <div className="modal-content">
             <button
-              onClick={() => setShowRegisterModal(false)}
+              onClick={() => appOnly ? onNavigate('login') : setShowRegisterModal(false)}
               style={{
                 position: 'absolute',
                 top: '16px',
