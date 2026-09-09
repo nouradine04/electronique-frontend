@@ -19,8 +19,9 @@ import {
   AlertCircle,
   Crown
 } from 'lucide-react';
+import logoImg from '../../assets/logo.png';
 
-export function Header({ activeTab, onOpenAddModal, onMenuClick }) {
+export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
   const { t, i18n } = useTranslation();
   const { isOnline, isLocalOnly, isSyncing, pendingCount, triggerManualSync } = useSync();
   const { currentShop, availableShops, switchShop, addShop, userRole, userName } = useShop();
@@ -139,6 +140,7 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick }) {
 
         {/* Left side: Search (Desktop/Tablet) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="mobile-app-brand"><img src={logoImg} alt="NStock" /><span>{currentShop?.name}</span></div>
           <div className="desktop-only" style={{ position: 'relative', width: '380px' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
@@ -159,11 +161,12 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick }) {
         </div>
 
         {/* Right Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="app-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
 
           {/* Language Toggle */}
           <button
             onClick={toggleLanguage}
+            className="app-language-toggle"
             style={{ padding: '8px', border: 'none', backgroundColor: 'transparent', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
             title="Changer la langue"
           >
@@ -296,6 +299,7 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick }) {
                   )}
 
                   {/* Add new shop */}
+                  <button type="button" onClick={onLogout} className="btn btn-secondary" style={{ margin: '10px 16px', minHeight: 44 }}>Se déconnecter</button>
                   <div style={{ borderTop: '1px solid var(--border-color)', padding: '8px 0' }}>
                     <button
                       onClick={() => { setShopError(''); setShowAddShopModal(true); setShowShopMenu(false); }}

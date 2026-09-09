@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Pagination } from '../../components/ui/Pagination.jsx';
+import { usePagination } from '../../components/ui/usePagination.js';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, querySales, queryClients, queryPayments, queryStockMovements, queryInvoices, database, createSale } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
@@ -83,6 +85,7 @@ export function SalesPage() {
     }
   };
 
+  const salePage = usePagination(filteredSales, `${currentShop?.id}:${searchQuery}:${dateFilter}:${statusFilter}`);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
@@ -155,7 +158,7 @@ export function SalesPage() {
                   <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Aucune vente trouvée.</td>
                 </tr>
               ) : (
-                filteredSales.map(sale => {
+                salePage.items.map(sale => {
                   const product = productMap[sale.product_id];
                   return (
                     <tr key={sale.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s' }}>
@@ -204,6 +207,7 @@ export function SalesPage() {
               )}
             </tbody>
           </table>
+          <Pagination {...salePage.props} itemLabel="vente" />
         </div>
       </div>
     </div>

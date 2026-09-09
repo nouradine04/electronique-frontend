@@ -17,6 +17,12 @@ import {
   Check, X, ChevronUp, FileText, Package
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { LocalImage } from '../../components/common/LocalImage.jsx';
+import { Pagination } from '../../components/ui/Pagination.jsx';
+import { usePagination } from '../../components/ui/usePagination.js';
+import './pos-products.css';
+
+const variantLabel = product => [product.storageCapacity || product.storage_capacity, product.ram && `${product.ram} RAM`, product.color, product.simType || product.sim_type].filter(Boolean).join(' · ');
 
 const BRAND = '#0e6ba8';
 
@@ -69,9 +75,10 @@ export function PosPage({ setActiveTab }) {
       if (String(p.status || '').toUpperCase() !== 'ACTIVE' || Number(p.price || 0) <= 0) return false;
       const n = (p.name || '').toLowerCase();
       const s = (p.sku || '').toLowerCase();
-      return n.includes(q) || s.includes(q);
+      return `${n} ${s} ${variantLabel(p)}`.toLowerCase().includes(q);
     });
   }, [allProducts, searchQuery]);
+  const productPage = usePagination(filteredProducts, `${currentShop?.id}:${searchQuery}`);
 
   const filteredClients = useMemo(() => {
     const q = (clientSearch || '').toLowerCase();
@@ -160,6 +167,7 @@ export function PosPage({ setActiveTab }) {
             m.shopId = currentShop.id;
             m.type = 'OUT';
             m.quantity = item.quantity;
+            m.reason = 'Vente client';
             m.userName = userName || 'Utilisateur';
             m.date = now;
             m.synced = false;
@@ -303,13 +311,15 @@ export function PosPage({ setActiveTab }) {
               <p>Aucun produit en stock</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-              {filteredProducts.map(product => (
-                <div key={product.id} className="pos-product-card" onClick={() => addToCart(product)}>
+            <div className="pos-products-grid">
+              {productPage.items.map(product => (
+                <button type="button" key={product.id} className="pos-product-card" onClick={() => addToCart(product)} aria-label={`Ajouter ${product.name}, ${variantLabel(product)}, ${product.price} FCFA`}>
+                  <div className="pos-product-photo"><LocalImage src={product.imageUrl || product.image_url} alt="" fallback={<Package size={30} />} /></div>
                   <div style={{ padding: '16px' }}>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px', lineHeight: 1.3 }}>
                       {product.name}
                     </div>
+                    <div className="pos-variant">{variantLabel(product) || 'Caractéristiques non renseignées'}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
                       {product.sku || 'Sans SKU'}
                     </div>
@@ -327,10 +337,12 @@ export function PosPage({ setActiveTab }) {
                     </div>
                   </div>
                   <div style={{ height: '3px', backgroundColor: BRAND, opacity: 0.2 }} />
-                </div>
+                  <span className="pos-add-label"><Plus size={14} /> Ajouter{cart.find(item => item.product.id === product.id) ? ` · ${cart.find(item => item.product.id === product.id).quantity} au panier` : ''}</span>
+                </button>
               ))}
             </div>
           )}
+          <Pagination {...productPage.props} itemLabel="produit" />
         </div>
       </div>
 
@@ -356,10 +368,12 @@ export function PosPage({ setActiveTab }) {
             ) : (
               cart.map(item => (
                 <div key={item.product.id} className="pos-cart-item">
+                  <span className="pos-cart-photo"><LocalImage src={item.product.imageUrl || item.product.image_url} alt="" fallback={<Package size={18} />} /></span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {item.product.name}
                     </div>
+                    <div className="pos-variant">{variantLabel(item.product)}</div>
                     <div style={{ fontSize: '13px', color: BRAND, fontWeight: 700 }}>
                       {(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA
                     </div>
@@ -535,7 +549,7 @@ export function PosPage({ setActiveTab }) {
             <div style={{ background: 'var(--bg-main)', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
               {invoiceData.items.map((item, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                  <span>{item.product.name} x{item.quantity}</span>
+                  <span>{item.product.name} x{item.quantity}<small className="pos-variant">{variantLabel(item.product)}</small></span>
                   <span style={{ fontWeight: 600 }}>{(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA</span>
                 </div>
               ))}

@@ -1,0 +1,22 @@
+.form-spinner { animation: form-spin .75s linear infinite; flex: 0 0 auto; }
+@keyframes form-spin { to { transform: rotate(360deg); } }
+.step-progress { display: flex; justify-content: center; align-items: center; gap: 34px; margin: 2px 0 24px; position: relative; }
+.step-progress::before { content: ''; position: absolute; width: 46px; height: 2px; background: var(--border-color); }
+.step-progress span { width: 30px; height: 30px; position: relative; z-index: 1; border-radius: 50%; display: grid; place-items: center; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 12px; font-weight: 700; }
+.step-progress span.done { background: #0e6ba8; border-color: #0e6ba8; color: white; }
+.form-step { display: grid; gap: 16px; }
+.form-progress { list-style: none; padding: 0; display: flex; margin: 4px 0 18px; }
+.form-progress li { position: relative; flex: 1; min-width: 0; }
+.form-progress li:not(:last-child)::after { content: ''; position: absolute; top: 23px; left: calc(50% + 29px); width: calc(100% - 58px); height: 2px; background: var(--border-color); }
+.form-progress button { display: flex; flex-direction: column; align-items: center; gap: 9px; width: 100%; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--text-muted); opacity: 1; }
+.form-progress button:not(:disabled) { cursor: pointer; }
+.progress-icon { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--border-color); background: var(--bg-main); }
+.form-progress .reached button { color: #0e6ba8; }
+.form-progress .reached .progress-icon { background: #0e6ba8; color: white; border-color: #0e6ba8; }
+.form-progress [aria-current=step] .progress-icon { box-shadow: 0 0 0 4px rgb(14 107 168 / 12%); }
+.field-error { display: block; color: var(--danger); font-size: 11px; margin-top: 5px; }
+.field-invalid { border-color: var(--danger) !important; }
+.form-actions { display: flex; gap: 10px; margin-top: 6px; }
+.form-actions > button { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.form-actions > button:last-child { flex: 1; }
+@media (prefers-reduced-motion: reduce) { .form-spinner { animation-duration: 1.4s; } }

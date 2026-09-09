@@ -145,7 +145,10 @@ export const decrementProductStock = async (product, qty) => {
 
 export const deleteProduct = async (product) => {
   return database.write(async () => {
-    return product.destroyPermanently();
+    return product.update(record => {
+      record.status = 'ARCHIVED';
+      record.synced = false;
+    });
   });
 };
 

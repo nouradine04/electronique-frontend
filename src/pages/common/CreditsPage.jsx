@@ -1,4 +1,7 @@
 import React, { useState, useMemo } from 'react';
+import { Pagination } from '../../components/ui/Pagination.jsx';
+import { usePagination } from '../../components/ui/usePagination.js';
+import { LoadingButton } from '../../components/forms/FormUI';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, querySales, queryClients, queryPayments, queryStockMovements, queryInvoices, database, createPayment } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
@@ -12,6 +15,7 @@ export function CreditsPage() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [notification, setNotification] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // Queries
   const clients = useQuery(queryClients(currentShop?.id || '')) || [];
@@ -49,9 +53,11 @@ export function CreditsPage() {
   });
 
   const totalOutstandingDebt = clientsWithDebt.reduce((sum, c) => sum + c.currentDebt, 0);
+  const clientPage = usePagination(filteredClients, `${currentShop?.id}:${searchQuery}`);
 
   const handleProcessPayment = async (e) => {
     e.preventDefault();
+    if (saving) return;
     if (!selectedClient || !paymentAmount || isNaN(paymentAmount) || paymentAmount <= 0) return;
     
     if (paymentAmount > selectedClient.currentDebt) {
@@ -59,6 +65,7 @@ export function CreditsPage() {
       return;
     }
 
+    setSaving(true);
     try {
       await createPayment({
         shop_id: currentShop.id,
@@ -75,7 +82,7 @@ export function CreditsPage() {
 
     } catch (err) {
       alert("Erreur lors de l'enregistrement : " + err.message);
-    }
+    } finally { setSaving(false); }
   };
 
   const openPaymentModal = (client) => {
@@ -141,7 +148,7 @@ export function CreditsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredClients.map(client => (
+                clientPage.items.map(client => (
                   <tr key={client.id}>
                     <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                       {client.name}
@@ -185,6 +192,7 @@ export function CreditsPage() {
       </div>
 
       {/* Payment Modal */}
+      <Pagination {...clientPage.props} itemLabel="client" />
       {paymentModalOpen && selectedClient && (
         <div style={{
           position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
@@ -224,8 +232,8 @@ export function CreditsPage() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setPaymentModalOpen(false)}>Annuler</button>
-                <button type="submit" className="btn btn-primary">Valider le paiement</button>
+                <button type="button" disabled={saving} className="btn btn-secondary" onClick={() => setPaymentModalOpen(false)}>Annuler</button>
+                <LoadingButton type="submit" loading={saving} className="btn btn-primary">Valider le paiement</LoadingButton>
               </div>
             </form>
           </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { isInstalledApp } from './services/appMode';
-import { useQuery } from './db/useQuery.js';
+import { useQueryState } from './db/useQuery.js';
+import { LoadingScreen } from './components/ui/LoadingScreen';
 import { queryProducts, querySales, queryCategories, queryStockMovements } from './db/queries.js';
 import { ShopProvider, useShop } from './context/ShopContext.jsx';
 import { SyncProvider } from './context/SyncContext.jsx';
@@ -29,10 +30,10 @@ import { ensurePersistentStorage } from './services/persistentStorage.js';
 
 function MainAppContent() {
   const { currentShop, userRole, isInitialized, logout } = useShop();
-  const products = useQuery(queryProducts(currentShop?.id || ''));
-  const sales = useQuery(querySales(currentShop?.id || ''));
-  const categories = useQuery(queryCategories(currentShop?.id || ''));
-  const movements = useQuery(queryStockMovements(currentShop?.id || ''));
+  const { records: products, loading: productsLoading } = useQueryState(queryProducts(currentShop?.id || ''));
+  const { records: sales, loading: salesLoading } = useQueryState(querySales(currentShop?.id || ''));
+  const { records: categories, loading: categoriesLoading } = useQueryState(queryCategories(currentShop?.id || ''));
+  const { records: movements, loading: movementsLoading } = useQueryState(queryStockMovements(currentShop?.id || ''));
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('userRole'));
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'dashboard'
   const [showAddModal, setShowAddModal] = useState(false);
@@ -68,12 +69,9 @@ function MainAppContent() {
     setIsAuthenticated(false);
   };
 
-  if (!isInitialized || !currentShop) {
+  if (!isInitialized || (isAuthenticated && (productsLoading || salesLoading || categoriesLoading || movementsLoading))) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-primary)', backgroundColor: 'var(--bg-main)', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ width: '40px', height: '40px', border: '4px solid var(--border-color)', borderTopColor: '#0e6ba8', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Chargement de la base de données locale...</p>
-      </div>
+      <LoadingScreen />
     );
   }
 
@@ -140,6 +138,7 @@ function MainAppContent() {
         
         {/* Top Header */}
         <Header
+          onLogout={handleLogout}
           activeTab={activeTab}
           onOpenAddModal={() => setShowAddModal(true)}
           onMenuClick={() => setIsMobileMenuOpen(true)}
@@ -210,12 +209,19 @@ function MainAppContent() {
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onLogout={handleLogout}
       />
     </div>
   );
 }
 
 export default function App() {
+  React.useEffect(() => {
+    const installed = isInstalledApp();
+    document.documentElement.classList.toggle('installed-app', installed);
+    return () => document.documentElement.classList.remove('installed-app');
+  }, []);
+
   return (
       <ToastProvider>
         <ShopProvider>

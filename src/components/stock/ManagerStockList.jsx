@@ -1,23 +1,33 @@
-import React, { useState } from 'react';
-import { Package, ChevronDown, Eye, Plus, Minus, Pencil } from 'lucide-react';
+import React from 'react';
+import { Package, Eye, Plus, Minus, Pencil, MapPin } from 'lucide-react';
 import { LocalImage } from '../common/LocalImage.jsx';
 
 export function ManagerStockList({ products, onView, onMovement, onEdit }) {
-  const [expanded, setExpanded] = useState(null);
-  return <div className="ms-products">{products.length === 0 ? <p className="ms-empty">Aucun produit trouvé. Essayez un autre filtre.</p> : products.map(product => {
+  if (products.length === 0) return <div className="ms-empty"><Package size={28} /><strong>Aucun produit trouvé</strong><span>Modifiez la recherche ou les filtres.</span></div>;
+
+  return <div className="ms-inventory" role="table" aria-label="État du stock">
+    <div className="ms-inventory-head" role="row">
+      <span role="columnheader">Produit</span><span role="columnheader">Emplacement</span><span role="columnheader">Disponible</span><span role="columnheader">État</span><span role="columnheader">Actions</span>
+    </div>
+    {products.map(product => {
     const pending = product.status === 'PENDING_PRICE';
-    const status = pending ? 'En attente admin' : product.quantity <= 0 ? 'Épuisé' : product.quantity <= (product.minStock ?? 5) ? 'Stock faible' : 'En stock';
-    const open = expanded === product.id;
-    return <article className="ms-product" key={product.id}>
-      <div className="ms-product-main">
-        <button className="ms-product-view" onClick={() => onView(product.id)} aria-label={`Voir ${product.name}`}>
-          <span className="ms-product-image">{product.imageUrl ? <LocalImage src={product.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Package size={24} />}</span>
-          <span className="ms-product-copy"><strong>{product.name}</strong><span>{pending ? 'Prix à définir par l’admin' : `${Number(product.price || 0).toLocaleString('fr-FR')} FCFA`}</span>{product.location && <small>{product.location}</small>}</span>
-        </button>
-        <div className="ms-product-stock"><strong>{product.quantity}</strong><small>en stock</small></div>
+    const minimum = product.minStock ?? product.min_stock ?? 5;
+    const status = pending ? 'En attente' : product.quantity <= 0 ? 'Rupture' : product.quantity <= minimum ? 'Stock faible' : 'En stock';
+    const statusClass = pending ? 'pending' : product.quantity <= 0 ? 'out' : product.quantity <= minimum ? 'low' : 'ok';
+    return <article className="ms-inventory-row" role="row" key={product.id}>
+      <button className="ms-item" role="cell" onClick={() => onView(product.id)} aria-label={`Voir la fiche de ${product.name}`}>
+        <span className="ms-item-image">{product.imageUrl ? <LocalImage src={product.imageUrl} alt="" /> : <Package size={22} />}</span>
+        <span className="ms-item-copy"><strong>{product.name}</strong><small>{product.sku || 'Sans référence'}{!pending && product.price ? ` · ${Number(product.price).toLocaleString('fr-FR')} FCFA` : ''}</small></span>
+      </button>
+      <div className="ms-location" role="cell"><MapPin size={15} /><span>{product.location || 'Non indiqué'}</span></div>
+      <div className="ms-quantity" role="cell"><strong>{Number(product.quantity || 0)}</strong><span>pièce{Number(product.quantity || 0) > 1 ? 's' : ''}</span><small>Seuil : {minimum}</small></div>
+      <div className="ms-status-cell" role="cell"><span className={`ms-stock-badge ${statusClass}`}>{status}</span>{pending && <small>Validation admin requise</small>}</div>
+      <div className="ms-row-actions" role="cell">
+        <button className="ms-movement in" title="Enregistrer une entrée" aria-label={`Ajouter une entrée pour ${product.name}`} onClick={() => onMovement(product, 'IN')}><Plus size={16} /><span>Entrée</span></button>
+        <button className="ms-movement out" title="Enregistrer une sortie" aria-label={`Ajouter une sortie pour ${product.name}`} onClick={() => onMovement(product, 'OUT')} disabled={Number(product.quantity || 0) === 0}><Minus size={16} /><span>Sortie</span></button>
+        <button className="ms-icon-action" onClick={() => onView(product.id)} aria-label={`Détails de ${product.name}`}><Eye size={17} /></button>
+        <button className="ms-icon-action" onClick={() => onEdit(product)} aria-label={`Modifier ${product.name}`}><Pencil size={17} /></button>
       </div>
-      <div className="ms-product-bottom"><span className={`ms-product-status ${pending || status === 'Stock faible' ? 'waiting' : status === 'Épuisé' ? 'empty' : ''}`}>{status}</span><button className="ms-manage" onClick={() => setExpanded(open ? null : product.id)} aria-expanded={open} aria-controls={`ms-actions-${product.id}`}>Gérer <ChevronDown size={15} style={{ transform: open ? 'rotate(180deg)' : undefined }} /></button></div>
-      {open && <div className="ms-product-menu" id={`ms-actions-${product.id}`}><button onClick={() => onView(product.id)}><Eye size={16} /> Détails</button><button onClick={() => onMovement(product, 'IN')}><Plus size={16} /> Entrée</button><button onClick={() => onMovement(product, 'OUT')}><Minus size={16} /> Sortie</button><button onClick={() => onEdit(product)}><Pencil size={16} /> Modifier</button></div>}
     </article>;
   })}</div>;
 }

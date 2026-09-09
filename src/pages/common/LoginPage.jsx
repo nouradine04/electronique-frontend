@@ -1,29 +1,35 @@
 import { Reveal } from '../../components/Reveal';
 import React, { useState } from 'react';
-import { Box, Lock, Mail, CheckCircle2 } from 'lucide-react';
+import { Lock, UserRound } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
-import { loginLocalUser } from '../../services/localAuth.js';
+import { loginLocalGoogleUser, loginLocalUser } from '../../services/localAuth.js';
 import logoImg from '../../assets/logo.png';
 import './public-responsive.css';
+import { LoadingButton } from '../../components/forms/FormUI';
+import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
+import { FormDivider, FormField, FormInput } from '../../components/ui/FormControls';
+import { LoadingScreen } from '../../components/ui/LoadingScreen';
 
 export function LoginPage({ onLoginSuccess, onNavigate }) {
   const { switchRole, switchShop } = useShop();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!identifier.trim()) { setError('Saisissez votre email ou votre numéro de téléphone.'); return; }
+    if (!password) { setError('Saisissez votre mot de passe.'); return; }
     setLoading(true);
     setError('');
 
     try {
-      const user = await loginLocalUser(email, password);
+      const user = await loginLocalUser(identifier, password);
       const { role, name } = user;
       await switchShop(user.shopId);
       sessionStorage.setItem('encryption_pin', password);
-      switchRole(role, name);
+      switchRole(role, name, user.id);
       setLoading(false);
       onLoginSuccess(role);
 
@@ -32,6 +38,20 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
       setLoading(false);
     }
   };
+
+  const completeGoogleLogin = async profile => {
+    setLoading(true); setError('');
+    try {
+      const user = await loginLocalGoogleUser(profile.email);
+      await switchShop(user.shopId);
+      sessionStorage.setItem('encryption_pin', profile.sub);
+      switchRole(user.role, user.name, user.id);
+      onLoginSuccess(user.role);
+    } catch (loginError) { setError(loginError.message || 'Connexion Google impossible.'); }
+    finally { setLoading(false); }
+  };
+
+  if (loading) return <LoadingScreen label="Connexion à votre boutique…" />;
 
   return (
     <div className="login-layout" style={{
@@ -120,7 +140,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
             </p>
           </div>
 
-          {error && (
+          {error && identifier && password && (
             <div style={{
               padding: '12px',
               backgroundColor: 'var(--danger-bg)',
@@ -134,54 +154,46 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>
-                Adresse Email
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  type="email"
+            <FormField id="login-identifier" label="Email ou numéro de téléphone" error={error && !identifier ? 'Saisissez votre email ou votre numéro.' : null}>
+                <FormInput
+                  id="login-identifier"
+                  leadingIcon={<UserRound size={18} />}
+                  type="text"
+                  inputMode={identifier.includes('@') ? 'email' : 'text'}
                   autoComplete="username"
-                  className="input-field"
-                  style={{ paddingLeft: '40px', height: '44px' }}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@nstock.com"
-                  required
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="email@exemple.com ou +221…"
+                  aria-invalid={Boolean(error) && !identifier}
                 />
-              </div>
-            </div>
+            </FormField>
 
-            <div style={{ marginBottom: '32px' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>
-                Mot de passe
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Lock size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
+            <FormField id="login-password" label="Mot de passe" error={error && !password ? 'Saisissez votre mot de passe.' : null}>
+                <FormInput
+                  id="login-password"
+                  leadingIcon={<Lock size={18} />}
                   type="password"
                   autoComplete="current-password"
-                  className="input-field"
-                  style={{ paddingLeft: '40px', height: '44px' }}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  required
+                  aria-invalid={Boolean(error) && !password}
                 />
-              </div>
-            </div>
+            </FormField>
 
-            <button
+            <LoadingButton
               type="submit"
-              disabled={loading}
+              loading={loading}
               className="btn btn-primary"
-              style={{ width: '100%', height: '44px', fontSize: '1rem', fontWeight: 600 }}
+              style={{ width: '100%', minHeight: '48px', marginTop: '24px', fontSize: '1rem', fontWeight: 600 }}
             >
-              {loading ? 'Connexion en cours...' : 'Se connecter'}
-            </button>
+              Se connecter
+            </LoadingButton>
+
+            <FormDivider />
+            <GoogleSignInButton onVerified={completeGoogleLogin} onError={setError} />
             
             {onNavigate && (
               <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.875rem' }}>
@@ -204,12 +216,6 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
               </div>
             )}
             
-            <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              Identifiants de test :<br/>
-              <span style={{ fontFamily: 'var(--font-mono)' }}>admin@nstock.com (admin)</span><br/>
-              <span style={{ fontFamily: 'var(--font-mono)' }}>gestionnaire@nstock.com (gest)</span>
-            </div>
-
           </form>
 
         </div></Reveal>

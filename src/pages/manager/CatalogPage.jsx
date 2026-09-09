@@ -1,16 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useQuery } from '../../db/useQuery.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
-import { queryCategories, queryProducts, createProduct, createCategory } from '../../db/queries.js';
+import { queryCategories, queryProducts, createProduct, createCategory, updateProduct } from '../../db/queries.js';
 import { recordStockMovement } from '../../services/syncEngine.js';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { Search, Plus, Package } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LocalImage } from '../../components/common/LocalImage.jsx';
+import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
+import { Pagination } from '../../components/ui/Pagination.jsx';
 
 export function CatalogManagementPage() {
-  const { currentShop, userName } = useShop();
+  const { currentShop, userName, userRole } = useShop();
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -19,7 +21,10 @@ export function CatalogManagementPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [showAddWizard, setShowAddWizard] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [catName, setCatName] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const BRAND = '#0e6ba8';
 
@@ -36,6 +41,19 @@ export function CatalogManagementPage() {
 
   const handleSaveProduct = async (productData) => {
     try {
+      if (productData.id) {
+        const current = products.find(product => product.id === productData.id);
+        await updateProduct(current, {
+          ...productData,
+          quantity: current.quantity,
+          price: current.price,
+          unit_cost: current.unitCost,
+          status: current.status,
+        });
+        showToast('Fiche produit mise à jour', 'success');
+        setEditingProduct(null);
+        return;
+      }
       const initialQuantity = Number(productData.quantity || 0);
       const product = await createProduct({
         ...productData,
@@ -85,6 +103,11 @@ export function CatalogManagementPage() {
       return nameMatch && catMatch && statusMatch;
     });
   }, [products, searchQuery, selectedCategory, statusFilter]);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  useEffect(() => setCurrentPage(1), [searchQuery, selectedCategory, statusFilter, currentShop?.id]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
   const pendingCount = products.filter(p => p.status === 'PENDING_PRICE').length;
   const outOfStockCount = products.filter(p => p.quantity === 0 && p.status !== 'PENDING_PRICE').length;
@@ -171,7 +194,7 @@ export function CatalogManagementPage() {
         </div>
       ) : (
         <div className="catalog-grid">
-          {filteredProducts.map(product => {
+          {paginatedProducts.map(product => {
             const cat = categories.find(c => c.id === product.categoryId);
             let badgeText = '';
             let badgeBg = '';
@@ -189,14 +212,17 @@ export function CatalogManagementPage() {
             }
 
             return (
-              <div 
+              <button type="button"
                 key={product.id} 
                 className="catalog-card"
+                onClick={() => setSelectedProductId(product.id)}
+                aria-label={`Ouvrir la fiche de ${product.name}`}
                 style={isPending ? {
                   border: '2px solid #c71f37',
                   backgroundColor: 'var(--bg-main)',
-                  opacity: 0.75
-                } : {}}
+                  opacity: 0.75,
+                  textAlign: 'left'
+                } : { textAlign: 'left' }}
               >
                 <div className="catalog-card-image">
                   {product.image_url ? (
@@ -226,11 +252,12 @@ export function CatalogManagementPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
+      <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredProducts.length} itemLabel="produit" onPageChange={setCurrentPage} />
 
       {/* Modals */}
       {showAddWizard && (
@@ -240,6 +267,10 @@ export function CatalogManagementPage() {
           onSubmit={handleSaveProduct} 
         />
       )}
+
+      {selectedProductId && <ProductDetailPage productId={selectedProductId} onBack={() => setSelectedProductId(null)} onEdit={product => { setSelectedProductId(null); setEditingProduct(product); }} />}
+
+      {editingProduct && <AddProductWizard initialData={editingProduct} categories={categories} catalogOnly={userRole === 'manager'} onClose={() => setEditingProduct(null)} onSubmit={handleSaveProduct} />}
 
       {showAddCategory && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>

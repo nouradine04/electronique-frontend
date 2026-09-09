@@ -16,6 +16,9 @@ export const localUserAccountColumns = [
   { name: 'is_active', type: 'boolean', isOptional: true },
   { name: 'account_created_at', type: 'string', isOptional: true },
 ];
+export const localUserPhoneColumns = [
+  { name: 'phone', type: 'string', isIndexed: true, isOptional: true },
+];
 
 export const shopSubscriptionColumns = [
   { name: 'subscription_plan', type: 'string', isOptional: true },
@@ -92,11 +95,11 @@ export const expenseSchema = {
 
 export const localUserSchema = {
   ...localUserV3Schema,
-  columns: [...localUserV3Schema.columns, ...localUserAccountColumns],
+  columns: [...localUserV3Schema.columns, ...localUserAccountColumns, ...localUserPhoneColumns],
 };
 
 export default appSchema({
-  version: 7,
+  version: 8,
   tables: [
     tableSchema(localUserSchema),
     tableSchema({

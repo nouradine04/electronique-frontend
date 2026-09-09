@@ -1,4 +1,6 @@
 import { LandingHero } from '../../components/LandingHero';
+import { FormStep, LoadingButton, StepProgress } from '../../components/forms/FormUI';
+import { FormField, FormInput } from '../../components/ui/FormControls';
 import { LandingNavbar } from '../../components/LandingNavbar';
 import React, { useState, useEffect } from 'react';
 import { InstallApp } from '../../components/InstallApp';
@@ -8,7 +10,7 @@ import { useShop } from '../../context/ShopContext.jsx';
 import { 
   Laptop, Tablet, Smartphone, ShieldCheck, Database, CheckCircle2, AlertCircle, ShoppingBag, 
   ArrowRight, ShieldAlert, Cpu, Sparkles, Printer, Zap, RefreshCw, X, ChevronRight, Globe, Sun, Moon,
-  LayoutDashboard, Package, TrendingUp, User, ShoppingCart
+  LayoutDashboard, Package, TrendingUp, User, ShoppingCart, Store, Mail, LockKeyhole
 } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
 import painCahierImg from '../../assets/pain_cahier.jpg';
@@ -145,14 +147,26 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
   const [shopName, setShopName] = useState('');
   const [adminName, setAdminName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registerStep, setRegisterStep] = useState(1);
 
   const openRegistration = (plan = 'standard') => {
     setSelectedPlan(plan);
     setError('');
+    setRegisterStep(1);
     setShowRegisterModal(true);
+  };
+
+  const goToCredentials = () => {
+    if (!shopName.trim() || !adminName.trim()) {
+      setError('Indiquez le nom de la boutique et votre nom.');
+      return;
+    }
+    setError('');
+    setRegisterStep(2);
   };
 
   const handleRegister = async (e) => {
@@ -160,8 +174,13 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
     setLoading(true);
     setError('');
 
-    if (!shopName || !adminName || !email || !password) {
-      setError('Veuillez remplir tous les champs');
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setError('Saisissez une adresse email valide.');
+      setLoading(false);
+      return;
+    }
+    if (password.length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caractères.');
       setLoading(false);
       return;
     }
@@ -169,10 +188,11 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
     try {
       const shopCode = shopName.toUpperCase().replace(/\s+/g, '').slice(0, 4) + Math.floor(1000 + Math.random() * 9000);
 
-      const newShop = await registerLocalShop({
+      const { shop: newShop, user: newUser } = await registerLocalShop({
         name: shopName,
         code: shopCode,
         email,
+        phone,
         password,
         adminName,
         subscriptionPlan: selectedPlan,
@@ -180,7 +200,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
 
       sessionStorage.setItem('encryption_pin', password);
       await switchShop(newShop.id);
-      switchRole('owner', adminName);
+      switchRole('owner', adminName, newUser.id);
       
       setLoading(false);
       setShowRegisterModal(false);
@@ -663,11 +683,8 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
             <h2 style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '20px' }}>
               Pourquoi NStock ?
             </h2>
-            <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '32px' }}>
-              Pour de nombreux commerçants à travers le monde, la continuité de l'énergie et la stabilité d'Internet sont de vrais défis quotidiens. Une panne de réseau ne devrait pas arrêter les ventes ni masquer vos comptes de crédit. 
-            </p>
-            <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '40px' }}>
-              NStock est conçu spécifiquement pour relever ce défi : une application légère qui s'exécute comme un logiciel traditionnel de caisse, protégeant vos comptes par cryptage et simplifiant la gestion des stocks, des crédits clients et du bénéfice net de votre boutique.
+            <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', lineHeight: '1.65', margin: '0 auto 32px', maxWidth: '650px' }}>
+              Continuez à vendre même sans connexion. Vos ventes, stocks, crédits et bénéfices restent simples à suivre depuis un seul espace.
             </p>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: '700', color: BRAND }}>
               La transition numérique simple, abordable et sécurisée.
@@ -932,7 +949,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
               
               <FaqItem 
                 question="Puis-je l’utiliser sur mon téléphone ?"
-                answer="Oui. NStock est une PWA (Progressive Web App). Vous pouvez l'installer directement sur n'importe quel smartphone Android ou iPhone en choisissant 'Ajouter à l'écran d'accueil' depuis votre navigateur. L'interface s'adaptera parfaitement à la taille de votre écran."
+                answer="Oui. Choisissez votre appareil dans la rubrique Installer et suivez le guide affiché. Une fois installée, l’application s’ouvre depuis son icône et s’adapte à votre écran."
               />
               
               <FaqItem 
@@ -952,29 +969,6 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
               
             </div>
 
-            <div style={{ textAlign: 'center', marginTop: '48px' }}>
-              <a 
-                href="https://wa.me/905527863655" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '10px', 
-                  backgroundColor: '#25d366', 
-                  color: 'white', 
-                  padding: '14px 28px', 
-                  borderRadius: '30px', 
-                  fontWeight: '700', 
-                  fontSize: '15px', 
-                  textDecoration: 'none',
-                  boxShadow: '0 8px 16px rgba(37, 211, 102, 0.2)' 
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: '6px' }}><path d="M12.012 2c-5.506 0-9.988 4.482-9.988 9.988 0 1.76.458 3.473 1.332 4.985l-1.354 4.954 5.074-1.33c1.46.797 3.097 1.217 4.762 1.217h.004c5.504 0 9.986-4.482 9.986-9.988 0-2.667-1.037-5.176-2.923-7.062-1.884-1.884-4.394-2.921-7.061-2.921zM6.924 8.24h.536c.162 0 .362.062.518.397.162.348.55 1.34.6 1.442.05.102.083.22.015.348-.067.129-.101.206-.2.32-.1.115-.21.258-.3.37-.1.109-.205.228-.088.428.118.2.523.86 1.12 1.393.77.689 1.42 1.05 1.623 1.155.203.105.321.088.44-.05.12-.137.513-.598.65-.8.136-.2.272-.17.458-.1.187.07 1.187.56 1.39.663.203.104.339.155.39.243.05.088.05.513-.153.722-.203.209-1.187 1.162-1.628 1.202-.44.04-1.018-.153-2.274-.658-1.583-.637-2.6-2.253-2.684-2.368-.084-.115-.678-.905-.678-1.724 0-.82.424-1.22.576-1.383.153-.162.339-.24.509-.24z"/></svg>
-                Une autre question ? — Écrivez-nous sur WhatsApp
-              </a>
-            </div>
           </div>
         </section>
       </>
@@ -1068,7 +1062,10 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
               })}
             </div>
 
-            {error && (
+            {error && !(
+              (registerStep === 1 && (!shopName.trim() || !adminName.trim()))
+              || (registerStep === 2 && (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8))
+            ) && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1086,123 +1083,30 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
               </div>
             )}
 
-            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                  Nom de la Boutique
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Électronique Fatima"
-                  value={shopName}
-                  onChange={(e) => setShopName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-main)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px'
-                  }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                  Nom de l'Administrateur
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ex: Fatima"
-                  value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-main)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px'
-                  }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                  Adresse Email
-                </label>
-                <input
-                  type="email"
-                  placeholder="admin@maboutique.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-main)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px'
-                  }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-secondary)' }}>
-                  Mot de passe
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-main)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px'
-                  }}
-                  required
-                />
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                  Sert également de clé de chiffrement pour verrouiller vos données locales.
-                </span>
-              </div>
-
-
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  backgroundColor: BRAND,
-                  color: 'white',
-                  border: 'none',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  fontWeight: '800',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginTop: '6px',
-                  boxShadow: '0 4px 6px -1px rgba(14, 107, 168, 0.15)'
-                }}
-              >
-                {loading ? 'Création...' : 'Créer ma boutique'}
-              </button>
-
+            <StepProgress step={registerStep} total={2} />
+            <form onSubmit={handleRegister} noValidate>
+              <FormStep stepKey={registerStep}>
+                {registerStep === 1 ? <>
+                  <FormField id="register-shop" label="Nom de la boutique" error={error && !shopName.trim() ? 'Indiquez le nom de votre boutique.' : null}>
+                    <FormInput id="register-shop" leadingIcon={<Store size={18} />} type="text" autoComplete="organization" placeholder="Ex. Électronique Fatima" value={shopName} onChange={(e) => { setShopName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !shopName.trim())} autoFocus />
+                  </FormField>
+                  <FormField id="register-name" label="Votre nom" error={error && !adminName.trim() ? 'Indiquez votre nom.' : null}>
+                    <FormInput id="register-name" leadingIcon={<User size={18} />} type="text" autoComplete="name" placeholder="Ex. Fatima" value={adminName} onChange={(e) => { setAdminName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !adminName.trim())} />
+                  </FormField>
+                  <div className="form-actions"><button type="button" className="btn btn-primary" onClick={goToCredentials}>Continuer <ArrowRight size={17} /></button></div>
+                </> : <>
+                  <FormField id="register-email" label="Adresse email" error={error && !/^\S+@\S+\.\S+$/.test(email) ? 'Saisissez une adresse email valide.' : null}>
+                    <FormInput id="register-email" leadingIcon={<Mail size={18} />} type="email" inputMode="email" autoComplete="email" placeholder="admin@maboutique.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} aria-invalid={Boolean(error && !/^\S+@\S+\.\S+$/.test(email))} autoFocus />
+                  </FormField>
+                  <FormField id="register-phone" label={<>Numéro de téléphone <span className="ui-optional">facultatif</span></>} help="Vous pourrez aussi utiliser ce numéro pour vous connecter.">
+                    <FormInput id="register-phone" leadingIcon={<Smartphone size={18} />} type="tel" inputMode="tel" autoComplete="tel" placeholder="Ex. +221 77 000 00 00" value={phone} onChange={(e) => { setPhone(e.target.value); setError(''); }} />
+                  </FormField>
+                  <FormField id="register-password" label="Mot de passe" error={error && password.length < 8 ? 'Utilisez au moins 8 caractères.' : null} help="Il protège aussi les données enregistrées sur cet appareil.">
+                    <FormInput id="register-password" leadingIcon={<LockKeyhole size={18} />} type="password" autoComplete="new-password" placeholder="8 caractères minimum" value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} aria-invalid={Boolean(error && password.length < 8)} />
+                  </FormField>
+                  <div className="form-actions"><button type="button" className="btn btn-secondary" onClick={() => { setError(''); setRegisterStep(1); }}>Retour</button><LoadingButton type="submit" loading={loading} className="btn btn-primary">Créer ma boutique</LoadingButton></div>
+                </>}
+              </FormStep>
             </form>
 
             <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: 'var(--text-secondary)' }}>

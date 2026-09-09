@@ -4,6 +4,7 @@ import { queryProducts, queryCategories, querySales, queryClients, queryPayments
 import { useShop } from '../../context/ShopContext.jsx';
 import { useTranslation } from 'react-i18next';
 import { Search, User, Users, Phone, CreditCard, X } from 'lucide-react';
+import { Pagination } from '../../components/ui/Pagination.jsx';
 
 export function ManagerClientsPage() {
   const { currentShop } = useShop();
@@ -13,6 +14,7 @@ export function ManagerClientsPage() {
   const [filterMode, setFilterMode] = useState('ALL'); // 'ALL' | 'DEBT' | 'PAID'
   const [selectedClient, setSelectedClient] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   useEffect(() => {
@@ -75,6 +77,11 @@ export function ManagerClientsPage() {
     
     return result.sort((a, b) => b.currentDebt - a.currentDebt);
   }, [clientsData, filterMode, searchQuery]);
+  const pageSize = isDesktop ? 12 : 8;
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / pageSize));
+  const paginatedClients = filteredClients.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  useEffect(() => setCurrentPage(1), [filterMode, searchQuery, currentShop?.id, isDesktop]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
   const clientsWithDebt = clientsData.filter(c => c.currentDebt > 0);
 
@@ -253,8 +260,8 @@ export function ManagerClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map((client, idx) => (
-                <tr key={client.id} style={{ borderBottom: idx !== filteredClients.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+              {paginatedClients.map((client, idx) => (
+                <tr key={client.id} style={{ borderBottom: idx !== paginatedClients.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
                   <td style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{
                       width: '32px',
@@ -318,7 +325,7 @@ export function ManagerClientsPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {filteredClients.map(client => (
+          {paginatedClients.map(client => (
             <div 
               key={client.id}
               onClick={() => setSelectedClient(client)}
@@ -376,6 +383,7 @@ export function ManagerClientsPage() {
           )}
         </div>
       )}
+      <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredClients.length} itemLabel="client" onPageChange={setCurrentPage} />
 
       {/* Bottom Sheet Modal */}
       {currentSelectedClient && (

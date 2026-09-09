@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Mail, ShieldCheck, Store, UserCheck, UserPlus, Users, X } from 'lucide-react';
+import { BadgeCheck, Building2, Mail, Phone, Store, UserPlus, UsersRound, X } from 'lucide-react';
+import { LoadingButton } from '../../components/forms/FormUI';
 import { useQuery } from '../../db/useQuery.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import {
@@ -9,7 +10,7 @@ import {
   setLocalUserActive,
 } from '../../services/localAuth.js';
 
-const EMPTY_FORM = { name: '', email: '', password: '' };
+const EMPTY_FORM = { name: '', email: '', phone: '', password: '' };
 
 export function TeamPage() {
   const { currentShop, userName } = useShop();
@@ -61,6 +62,7 @@ export function TeamPage() {
       id: 'current-owner',
       name: userName || 'Administrateur',
       email: users.find(user => user.role === 'owner')?.email || currentShop.email || 'Compte administrateur',
+      phone: users.find(user => user.role === 'owner')?.phone || '',
       role: 'Administrateur',
       isActive: true,
       isOwner: true,
@@ -69,6 +71,7 @@ export function TeamPage() {
       id: manager.id,
       name: manager.name,
       email: manager.email,
+      phone: manager.phone,
       role: 'Gestionnaire',
       isActive: manager.isActive,
       model: manager,
@@ -119,15 +122,15 @@ export function TeamPage() {
 
       <div className="team-stats">
         {[
-          { icon: Users, label: 'Gestionnaires / employés', value: managers.length, color: '#0e6ba8', bg: '#e8f3fb' },
-          { icon: UserCheck, label: 'Comptes actifs', value: activeManagers, color: '#15803d', bg: '#ecfdf3' },
-          { icon: ShieldCheck, label: `Plan ${plan.label}`, value: remaining === null ? 'Illimité' : `${remaining} place${remaining > 1 ? 's' : ''}`, color: '#7c3aed', bg: '#f3e8ff' },
+          { icon: UsersRound, label: 'Gestionnaires / employés', value: managers.length, color: '#0e6ba8' },
+          { icon: BadgeCheck, label: 'Comptes actifs', value: activeManagers, color: '#15803d' },
+          { icon: Building2, label: `Plan ${plan.label}`, value: remaining === null ? 'Illimité' : `${remaining} place${remaining > 1 ? 's' : ''}`, color: '#7c3aed' },
         ].map(item => {
           const Icon = item.icon;
           return (
             <div key={item.label} className="team-card" style={{ padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: item.bg, color: item.color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                <Icon size={22} />
+              <div style={{ width: '34px', height: '46px', color: item.color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <Icon size={25} strokeWidth={2} />
               </div>
               <div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>{item.label}</div>
@@ -159,6 +162,7 @@ export function TeamPage() {
                   <Mail size={12} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{account.email}</span>
                 </div>
+                {account.phone && <div style={{ color: 'var(--text-muted)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}><Phone size={12} />{account.phone}</div>}
               </div>
             </div>
 
@@ -211,13 +215,17 @@ export function TeamPage() {
                   <input className="input-field" type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} placeholder="gestionnaire@boutique.com" required style={{ marginTop: '6px' }} />
                 </label>
                 <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  Numéro de téléphone
+                  <input className="input-field" type="tel" inputMode="tel" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} placeholder="+221 77 000 00 00" style={{ marginTop: '6px' }} />
+                </label>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
                   Mot de passe temporaire
                   <input className="input-field" type="password" minLength={4} value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} placeholder="4 caractères minimum" required style={{ marginTop: '6px' }} />
                 </label>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '9px', marginTop: '22px' }}>
                 <button type="button" className="btn btn-secondary" onClick={closeForm}>Annuler</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Création…' : 'Créer le compte'}</button>
+                <LoadingButton type="submit" className="btn btn-primary" loading={saving}>Créer le compte</LoadingButton>
               </div>
             </form>
           </div>

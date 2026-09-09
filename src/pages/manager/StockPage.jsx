@@ -1,55 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '../../db/useQuery.js';
-import { queryProducts, queryCategories, querySales, queryClients, queryPayments, queryStockMovements, queryInvoices, database, updateProduct, createProduct } from '../../db/queries.js';
+import { queryProducts, queryCategories, queryStockMovements, updateProduct, createProduct } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { recordStockMovement } from '../../services/syncEngine.js';
-import { ProductCard } from '../../components/stock/ProductCard.jsx';
 import { StockMovementModal } from '../../components/stock/StockMovementModal.jsx';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
 import {
   Search,
   Plus,
-  Filter,
-  AlertTriangle,
-  Layers,
-  Cpu,
-  LayoutGrid,
-  List,
-  ArrowUpDown,
-  MoreVertical,
-  Minus,
-  CheckCircle2,
-  ExternalLink,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Package,
-  MapPin,
-  FileText,
-  Eye,
-  DollarSign
+  Package
 } from 'lucide-react';
 
 import './stock.css';
 import { ManagerStockList } from '../../components/stock/ManagerStockList.jsx';
+import { ManagerStockJournal } from '../../components/stock/ManagerStockJournal.jsx';
 
 export function ManagerStockPage({ onOpenAddProduct }) {
-  const { currentShop, userName, userRole } = useShop();
+  const { currentShop, userName } = useShop();
   const { showToast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'LOW' | 'OUT'
-  const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
+  const [activeView, setActiveView] = useState('inventory');
+  const [movementType, setMovementType] = useState('ALL');
   const [sortField, setSortField] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
 
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
-  useEffect(() => { setCurrentPage(1); }, [searchQuery, selectedCategory, statusFilter, currentShop?.id]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, selectedCategory, statusFilter, movementType, activeView, currentShop?.id]);
 
   const [movementModal, setMovementModal] = useState({ open: false, product: null, type: 'OUT' });
   const [productFormModal, setProductFormModal] = useState({ open: false, product: null });
@@ -59,6 +43,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
   // Requête WatermelonDB réactive sur le stock de la boutique active
   const categories = useQuery(queryCategories(currentShop?.id || '')) || [];
   const products = useQuery(queryProducts(currentShop?.id || '')) || [];
+  const movements = useQuery(queryStockMovements(currentShop?.id || '')) || [];
 
   // Filter & Sort Logic
   const filteredProducts = products.filter(product => {
@@ -88,8 +73,17 @@ export function ManagerStockPage({ onOpenAddProduct }) {
   });
 
   // Pagination calculation
-  const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const productsById = new Map(products.map(product => [product.id, product]));
+  const filteredMovements = movements.filter(movement => {
+    const product = productsById.get(movement.productId || movement.product_id);
+    const query = searchQuery.trim().toLowerCase();
+    const matchesType = movementType === 'ALL' || movement.type === movementType;
+    const matchesSearch = !query || [product?.name, movement.reason, movement.userName, movement.deliveryReference].some(value => String(value || '').toLowerCase().includes(query));
+    return matchesType && matchesSearch;
+  });
+  const paginatedMovements = filteredMovements.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const totalPages = Math.ceil((activeView === 'inventory' ? filteredProducts.length : filteredMovements.length) / rowsPerPage) || 1;
 
   const handleExecuteMovement = async (movementData) => {
     try {
@@ -153,150 +147,101 @@ export function ManagerStockPage({ onOpenAddProduct }) {
     }
   };
 
-  const [pendingPriceModal, setPendingPriceModal] = useState({ open: false, product: null });
-  const [pendingPrices, setPendingPrices] = useState({ unit_cost: 0, price: 0 });
-
   // Metrics summary
   const lowStockCount = products.filter(p => p.status !== 'PENDING_PRICE' && p.quantity <= (p.minStock || 5) && p.quantity > 0).length;
   const outOfStockCount = products.filter(p => p.status !== 'PENDING_PRICE' && p.quantity === 0).length;
   const pendingCount = products.filter(p => p.status === 'PENDING_PRICE').length;
+  const totalUnits = products.reduce((sum, product) => sum + Number(product.quantity || 0), 0);
 
   if (selectedProductId) {
     return <ProductDetailPage productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
   }
-
-  const handleFixPrice = async (e) => {
-    e.preventDefault();
-    try {
-      const unitCost = Number(pendingPrices.unit_cost);
-      const salePrice = Number(pendingPrices.price);
-      if (unitCost <= 0 || salePrice <= 0) {
-        showToast('Le coût d’achat et le prix de vente doivent être supérieurs à zéro.', 'danger');
-        return;
-      }
-      await updateProduct(pendingPriceModal.product, {
-        unit_cost: unitCost,
-        price: salePrice,
-        status: 'ACTIVE'
-      });
-      showToast('Prix validés avec succès ! Le produit est maintenant actif.', 'success');
-      setPendingPriceModal({ open: false, product: null });
-    } catch (err) {
-      showToast('Erreur: ' + err.message, 'danger');
-    }
-  };
 
   return (
     <div className="manager-stock" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       
 
 
-      <header className="ms-heading"><div><h2>Stock & Produits</h2><p>{currentShop?.name} · {products.length} produits</p></div><button className="btn btn-primary ms-add" onClick={() => setProductFormModal({ open: true, product: null })}><Plus size={18} /> Ajouter un produit</button></header>
-      {userRole === 'owner' && pendingCount > 0 && (
-        <div style={{ padding: '16px 20px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--warning-bg)', border: '1px solid var(--warning)', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <AlertTriangle size={24} color="var(--warning)" />
-          <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--warning)', margin: 0 }}>Action requise : {pendingCount} produit(s) en attente de prix</h3>
-            <p style={{ fontSize: '0.875rem', margin: '4px 0 0 0', color: 'var(--text-secondary)' }}>Des produits ont été ajoutés par le gestionnaire. Fixez leurs prix pour les rendre disponibles à la vente.</p>
-          </div>
-        </div>
-      )}
-
+      <header className="ms-heading"><div><h2>Stock</h2><p>{currentShop?.name} · inventaire de la boutique</p></div><button className="btn btn-primary ms-add" aria-label="Ajouter un produit" onClick={() => setProductFormModal({ open: true, product: null })}><Plus size={18} /><span>Ajouter un produit</span></button></header>
+      <div className="ms-overview" aria-label="Résumé du stock">
+        <button type="button" onClick={() => { setActiveView('inventory'); setStatusFilter('ALL'); }}><span>Produits</span><strong>{products.length}</strong></button>
+        <div><span>Unités disponibles</span><strong>{totalUnits}</strong></div>
+        <button type="button" className="low" onClick={() => { setActiveView('inventory'); setStatusFilter('LOW'); }}><span>Stock faible</span><strong>{lowStockCount}</strong></button>
+        <button type="button" className="alert" onClick={() => { setActiveView('inventory'); setStatusFilter('OUT'); }}><span>Ruptures</span><strong>{outOfStockCount}</strong></button>
+        {pendingCount > 0 && <button type="button" className="low" onClick={() => { setActiveView('inventory'); setStatusFilter('PENDING'); }}><span>En attente</span><strong>{pendingCount}</strong></button>}
+      </div>
+      <div className="ms-view-tabs" role="tablist" aria-label="Contenu du stock">
+        <button type="button" role="tab" aria-selected={activeView === 'inventory'} onClick={() => { setActiveView('inventory'); setCurrentPage(1); }}>État du stock</button>
+        <button type="button" role="tab" aria-selected={activeView === 'history'} onClick={() => { setActiveView('history'); setCurrentPage(1); }}>Mouvements <span>{movements.length}</span></button>
+      </div>
       {/* Main Table Panel */}
-      <div className="surface-panel" style={{ overflow: 'hidden' }}>
+      <div className="ms-stock-panel">
         
         {/* Controls Toolbar */}
-        <div className="ms-toolbar" style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          
-          <div style={{ position: 'relative', width: '300px' }}>
-            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+        <div className="ms-toolbar">
+          <div className="ms-search">
+            <Search size={16} />
             <input
               type="text"
               className="input-field"
-              style={{ paddingLeft: '36px' }}
-              placeholder="Rechercher un produit…"
+              placeholder="Nom, référence ou emplacement…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <select
+            {activeView === 'inventory' && <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="input-field"
-              style={{ width: 'auto', py: '6px' }}
+              aria-label="Filtrer par catégorie"
             >
-              <option value="ALL">Toutes Catégories</option>
+              <option value="ALL">Toutes catégories</option>
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </select>
+            </select>}
 
-            <select
+            {activeView === 'inventory' ? <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="input-field"
-              style={{ width: 'auto', py: '6px' }}
+              aria-label="Filtrer par état du stock"
             >
               <option value="ALL">Tous les statuts</option>
               <option value="PENDING">En attente admin</option>
-              <option value="LOW">Stock Bas</option>
+              <option value="LOW">Stock faible</option>
               <option value="OUT">Rupture</option>
-            </select>
-          </div>
+            </select> : <select value={movementType} onChange={event => { setMovementType(event.target.value); setCurrentPage(1); }} className="input-field" aria-label="Filtrer par type de mouvement">
+              <option value="ALL">Tous les mouvements</option><option value="IN">Approvisionnements</option><option value="OUT">Ventes et sorties</option><option value="ADJUST">Ajustements</option>
+            </select>}
         </div>
 
-        <ManagerStockList products={paginatedProducts} onView={setSelectedProductId} onMovement={(product, type) => setMovementModal({ open: true, product, type })} onEdit={product => setProductFormModal({ open: true, product })} />
+        {activeView === 'inventory'
+          ? <ManagerStockList products={paginatedProducts} onView={setSelectedProductId} onMovement={(product, type) => setMovementModal({ open: true, product, type })} onEdit={product => setProductFormModal({ open: true, product })} />
+          : <ManagerStockJournal movements={paginatedMovements} productsById={productsById} />}
 
         {/* Pagination Footer */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px', borderTop: '1px solid var(--border-color)',
-          fontSize: '0.875rem', color: 'var(--text-muted)'
-        }}>
-          <div>
-            Total : {filteredProducts.length} produit(s)
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <span>Lignes par page : {rowsPerPage}</span>
-            <span>Page {currentPage} sur {totalPages}</span>
-            
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                className="btn btn-secondary"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(1)}
-                style={{ padding: '4px' }}
-              >
-                <ChevronsLeft size={16} />
-              </button>
+        <div className="ms-pagination">
+          <span>{activeView === 'inventory' ? `${filteredProducts.length} produit${filteredProducts.length > 1 ? 's' : ''}` : `${filteredMovements.length} mouvement${filteredMovements.length > 1 ? 's' : ''}`}</span>
+          <div className="ms-page-controls">
               <button
                 className="btn btn-secondary"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                style={{ padding: '4px' }}
+                aria-label="Page précédente"
               >
                 <ChevronLeft size={16} />
               </button>
+              <span>Page {currentPage} / {totalPages}</span>
               <button
                 className="btn btn-secondary"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                style={{ padding: '4px' }}
+                aria-label="Page suivante"
               >
                 <ChevronRight size={16} />
               </button>
-              <button
-                className="btn btn-secondary"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(totalPages)}
-                style={{ padding: '4px' }}
-              >
-                <ChevronsRight size={16} />
-              </button>
-            </div>
           </div>
         </div>
 
@@ -319,36 +264,6 @@ export function ManagerStockPage({ onOpenAddProduct }) {
           onClose={() => { setProductFormModal({ open: false, product: null }); }}
           onSubmit={handleSaveProduct}
         />
-      )}
-
-      {pendingPriceModal.open && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
-          <div className="surface-panel" style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Fixer les Prix</h3>
-              <button type="button" onClick={() => setPendingPriceModal({ open: false, product: null })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
-                <Plus size={20} style={{ transform: 'rotate(45deg)' }} />
-              </button>
-            </div>
-            <form onSubmit={handleFixPrice} style={{ padding: '20px' }}>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                Produit : <strong>{pendingPriceModal.product?.name}</strong>
-              </p>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>Coût d'achat (FCFA)</label>
-                <input type="number" className="input-field" value={pendingPrices.unit_cost} onChange={e => setPendingPrices(p => ({ ...p, unit_cost: e.target.value }))} required />
-              </div>
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', display: 'block', marginBottom: '8px' }}>Prix de vente (FCFA)</label>
-                <input type="number" className="input-field" value={pendingPrices.price} onChange={e => setPendingPrices(p => ({ ...p, price: e.target.value }))} required />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setPendingPriceModal({ open: false, product: null })}>Annuler</button>
-                <button type="submit" className="btn btn-primary">Valider les Prix</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
     </div>

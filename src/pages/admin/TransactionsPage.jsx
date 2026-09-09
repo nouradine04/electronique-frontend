@@ -4,6 +4,7 @@ import { useShop } from '../../context/ShopContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { querySales, queryProducts, queryClients, queryReturns, processSaleReturn } from '../../db/queries.js';
 import { ReturnSaleModal } from '../../components/sales/ReturnSaleModal.jsx';
+import { Pagination } from '../../components/ui/Pagination.jsx';
 import { Search, Filter, Calendar, Banknote, Receipt, CreditCard, AlertCircle, Check, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +18,7 @@ export function TransactionsPage() {
   const [paymentFilter, setPaymentFilter] = useState('tous');
   const [selectedReturnSale, setSelectedReturnSale] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -93,6 +95,11 @@ export function TransactionsPage() {
       return true;
     });
   }, [allSales, allProducts, allClients, timeFilter, customDate, paymentFilter, searchQuery]);
+  const pageSize = isMobile ? 6 : 12;
+  const totalPages = Math.max(1, Math.ceil(filteredSales.length / pageSize));
+  const paginatedSales = filteredSales.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  useEffect(() => setCurrentPage(1), [searchQuery, timeFilter, customDate, paymentFilter, currentShop?.id]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
   const totalEncaisse = filteredSales
     .filter(sale => sale.paymentMethod !== 'credit')
@@ -198,7 +205,13 @@ export function TransactionsPage() {
         @media (max-width: 520px) {
           .tp-period-desktop { display: none; }
           .tp-period-mobile { display: block; }
-          .tp-mobile-meta { grid-template-columns: 1fr; }
+          .tp-transaction-card { padding: 12px; }
+          .tp-mobile-meta { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 12px; }
+          .tp-transaction-main > div:first-child > div:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        }
+        @media (max-width: 350px) {
+          .tp-transaction-main { grid-template-columns: 1fr; }
+          .tp-transaction-main > div:last-child { text-align: left !important; }
         }
       `}</style>
 
@@ -308,7 +321,7 @@ export function TransactionsPage() {
           </div>
         ) : isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px' }}>
-            {filteredSales.map((sale, idx) => {
+            {paginatedSales.map((sale, idx) => {
               const product = allProducts.find(p => p.id === sale.productId);
               const client = allClients.find(c => c.id === sale.clientId);
               const returnInfo = returnsBySale.get(sale.id) || { quantity: 0, refund: 0 };
@@ -370,7 +383,7 @@ export function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSales.map((sale, idx) => {
+                {paginatedSales.map((sale, idx) => {
                   const product = allProducts.find(p => p.id === sale.productId);
                   const client = allClients.find(c => c.id === sale.clientId);
                   const returnInfo = returnsBySale.get(sale.id) || { quantity: 0, refund: 0 };
@@ -412,6 +425,7 @@ export function TransactionsPage() {
           </div>
         )}
       </div>
+      <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredSales.length} itemLabel="vente" onPageChange={setCurrentPage} />
 
       {selectedReturnSale && (
         <ReturnSaleModal

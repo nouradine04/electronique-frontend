@@ -12,11 +12,13 @@
 .shop-preview-caption > span { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
 .shop-preview-caption small { font-size: 11px; color: #526779; }
 .shop-preview-grid { display: grid; grid-template-columns: 1.3fr 1fr .85fr; gap: 16px; }
-.shop-preview-grid > div { min-width: 0; border-radius: 12px; padding: 22px; background: white; }
+.shop-preview-grid > div { min-width: 0; border: 1px solid rgba(82,103,121,.12); border-radius: 12px; padding: 22px; background: white; transition: box-shadow .3s ease, border-color .3s ease; }
+.shop-preview-grid > div.is-active { border-color: rgba(14,107,168,.26); box-shadow: 0 15px 34px rgba(23,43,60,.13); }
 .shop-preview-grid strong { display: block; font-size: clamp(24px,3vw,36px); letter-spacing: -.04em; margin: 16px 0; }
 .shop-preview-grid strong small { font-size: 12px; font-weight: 500; letter-spacing: 0; }
 .shop-preview-grid span { font-size: 13px; }
 .shop-preview-grid .shop-cash { background: #0e6ba8; color: white; }
+.shop-preview-grid .shop-cash.is-active { border-color: rgba(255,255,255,.5); box-shadow: 0 18px 36px rgba(14,107,168,.3); }
 .shop-bars { height: 78px; display: flex; gap: 8px; align-items: end; margin: 20px 0 14px; }
 .shop-bars i { flex: 1; background: rgba(255,255,255,.7); border-radius: 3px 3px 0 0; transform-origin: bottom; }
 .shop-stock > span { display: flex; align-items: center; gap: 8px; }

@@ -2,6 +2,7 @@ import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/S
 import {
   localUserV3Schema,
   localUserAccountColumns,
+  localUserPhoneColumns,
   shopSubscriptionColumns,
   shopAccountColumns,
   productCatalogColumns,
@@ -37,5 +38,6 @@ export default schemaMigrations({
         createTable(expenseSchema),
       ],
     },
+    { toVersion: 8, steps: [addColumns({ table: 'local_users', columns: localUserPhoneColumns })] },
   ],
 });

@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, querySales, queryClients, queryPayments } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { FaTimes, FaSearch, FaChevronRight, FaPhoneAlt, FaUser, FaCreditCard, FaCoins } from 'react-icons/fa';
+import { Pagination } from '../../components/ui/Pagination.jsx';
 
 const BRAND = '#0e6ba8';
 
@@ -13,6 +14,7 @@ export function CrmPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all'); // 'all' | 'credit'
   const [selectedClient, setSelectedClient] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const clients = useQuery(queryClients(currentShop?.id || '')) || [];
   const sales = useQuery(querySales(currentShop?.id || '')) || [];
@@ -53,6 +55,11 @@ export function CrmPage() {
     }
     return list;
   }, [clientStats, filter, search]);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / pageSize));
+  const paginatedClients = filteredClients.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  useEffect(() => setCurrentPage(1), [filter, search, currentShop?.id]);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
   const totalClients = clientStats.length;
   const clientsWithDebt = clientStats.filter(c => c.resteAPayer > 0).length;
@@ -117,7 +124,7 @@ export function CrmPage() {
           </div>
         )}
 
-        {filteredClients.map(client => (
+        {paginatedClients.map(client => (
           <div
             key={client.id}
             onClick={() => setSelectedClient(client)}
@@ -158,6 +165,7 @@ export function CrmPage() {
           </div>
         ))}
       </div>
+      <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredClients.length} itemLabel="client" onPageChange={setCurrentPage} />
 
       {/* Client Detail Bottom Sheet */}
       {selectedClient && (

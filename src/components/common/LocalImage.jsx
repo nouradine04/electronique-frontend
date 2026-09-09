@@ -3,10 +3,12 @@ import { isLocalMediaReference, resolveLocalImage } from '../../services/localMe
 
 export function LocalImage({ src, fallback = null, ...props }) {
   const [resolvedSource, setResolvedSource] = useState(() => isLocalMediaReference(src) ? '' : (src || ''));
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
     let objectUrl = '';
+    setFailed(false);
 
     if (!src) {
       setResolvedSource('');
@@ -32,5 +34,11 @@ export function LocalImage({ src, fallback = null, ...props }) {
     };
   }, [src]);
 
-  return resolvedSource ? <img src={resolvedSource} {...props} /> : fallback;
+  if (!resolvedSource || failed) return fallback;
+
+  const { onError, ...imageProps } = props;
+  return <img src={resolvedSource} {...imageProps} onError={event => {
+    setFailed(true);
+    onError?.(event);
+  }} />;
 }

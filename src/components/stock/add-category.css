@@ -1,0 +1,9 @@
+.category-overlay { position: fixed; inset: 0; z-index: 1100; background: rgb(15 23 42 / 40%); }
+.category-dialog { box-sizing: border-box; position: fixed; z-index: 1101; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100% - 28px)); max-height: 90dvh; overflow: auto; padding: 22px; border: 1px solid var(--border-color); border-radius: 16px; background: var(--bg-surface); color: var(--text-primary); box-shadow: 0 24px 64px rgb(0 0 0 / 18%); }
+.category-heading { display: flex; align-items: center; gap: 9px; }
+.category-heading > svg { color: var(--accent-primary); }
+.category-heading h2 { margin: 0; font-size: 18px; }
+.category-heading button { margin-left: auto; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.category-dialog > p { margin: 8px 0 22px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.category-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+.category-actions button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }

@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { Pagination } from '../../components/ui/Pagination.jsx';
+import { usePagination } from '../../components/ui/usePagination.js';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '../../db/useQuery.js';
 import { createExpense, queryCategories, queryExpenses, queryProducts, queryReturns, querySales } from '../../db/queries.js';
@@ -147,6 +149,9 @@ export function ProfitPage() {
     }
   };
 
+  const expensePage = usePagination([...filteredExpenses].sort((a, b) => new Date(b.date) - new Date(a.date)), `${currentShop?.id}:${timeFilter}`, 6);
+  const marginPage = usePagination(productProfitability, `${currentShop?.id}:${search}`);
+
   if (!currentShop) return <div style={{ padding: '24px' }}>Veuillez sélectionner une boutique.</div>;
 
   const chartOptions = {
@@ -185,7 +190,7 @@ export function ProfitPage() {
           </div>
           <span style={{ color: '#dc2626', fontWeight: 800, fontSize: '14px' }}>{money(operatingExpenses)}</span>
         </div>
-        {filteredExpenses.length ? [...filteredExpenses].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6).map(expense => (
+        {filteredExpenses.length ? expensePage.items.map(expense => (
           <div key={expense.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '11px 0', borderTop: '1px solid var(--border-color)' }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.description}</div>
@@ -194,6 +199,7 @@ export function ProfitPage() {
             <strong style={{ color: '#dc2626', whiteSpace: 'nowrap', fontSize: '13px' }}>− {money(expense.amount)}</strong>
           </div>
         )) : <div style={{ padding: '20px 0 4px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>Aucune dépense sur cette période.</div>}
+        <Pagination {...expensePage.props} itemLabel="dépense" />
       </section>
 
       <details className="profit-details"><summary>Consulter les marges par produit</summary><p className="profit-detail-note">Prix actuels et historique depuis le début. La marge par unité ne déduit pas les dépenses de la boutique.</p>
@@ -204,7 +210,7 @@ export function ProfitPage() {
 
       <section style={{ display: 'grid', gap: '10px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Marge par produit</h3>
-        {productProfitability.map(item => (
+        {marginPage.items.map(item => (
           <button key={item.product.id} onClick={() => setSelectedProduct(item)} style={{ width: '100%', padding: '15px', borderRadius: '12px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', textAlign: 'left', color: 'var(--text-primary)' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product.name}</div>
@@ -221,6 +227,7 @@ export function ProfitPage() {
         {!productProfitability.length && <div style={{ padding: '38px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-surface)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>Aucun produit avec un prix de vente.</div>}
       </section>
 
+      <Pagination {...marginPage.props} itemLabel="produit" />
       </details>
 
       {selectedProduct && (

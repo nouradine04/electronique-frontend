@@ -1,0 +1,10 @@
+.settings-page { width: 100%; min-width: 0; }
+.settings-page *, .settings-page *::before, .settings-page *::after { box-sizing: border-box; }
+.settings-page input, .settings-page select { min-width: 0; max-width: 100%; font-size: 16px; }
+.required-star { color: #dc2626; }
+.settings-page button { white-space: normal; min-height: 44px; }
+@media (max-width: 600px) {
+  .settings-page > div { padding: 16px !important; }
+  .settings-page div[style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
+  .settings-page div[style*="display: flex"] { flex-wrap: wrap; }
+}

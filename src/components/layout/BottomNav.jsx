@@ -14,14 +14,16 @@ import {
   Settings,
   ShieldCheck,
   MoreHorizontal,
-  X
+  X,
+  LogOut,
+  UserRound
 } from 'lucide-react';
 
 const BRAND = '#0e6ba8';
 
-export function BottomNav({ activeTab, setActiveTab }) {
+export function BottomNav({ activeTab, setActiveTab, onLogout }) {
   const { t } = useTranslation();
-  const { userRole } = useShop();
+  const { userRole, userName } = useShop();
   const [showMore, setShowMore] = useState(false);
 
   const NavItem = ({ id, icon: Icon, label, isBig }) => {
@@ -57,7 +59,7 @@ export function BottomNav({ activeTab, setActiveTab }) {
     { id: 'profit', icon: TrendingUp, label: t('bottom_nav.profit') },
     { id: 'crm', icon: Users, label: t('bottom_nav.clients') },
     { id: 'team', icon: ShieldCheck, label: t('bottom_nav.team') },
-    { id: 'settings', icon: Settings, label: t('bottom_nav.settings') },
+    { id: 'settings', icon: Settings, label: 'Profil et réglages' },
   ];
 
   // Manager tabs: 3 principales + Plus
@@ -71,7 +73,7 @@ export function BottomNav({ activeTab, setActiveTab }) {
     { id: 'add', icon: PackagePlus, label: 'Catalogue' },
     { id: 'manager-clients', icon: Users, label: t('bottom_nav.clients') },
     { id: 'invoices', icon: FileText, label: t('bottom_nav.invoices') },
-    { id: 'settings', icon: Settings, label: t('bottom_nav.settings') },
+    { id: 'settings', icon: Settings, label: 'Profil et réglages' },
   ];
 
   const mainTabs = userRole === 'owner' ? ownerMainTabs : managerMainTabs;
@@ -83,16 +85,21 @@ export function BottomNav({ activeTab, setActiveTab }) {
       {/* Overlay menu "Plus" */}
       {showMore && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1060 }} onClick={() => setShowMore(false)}>
-          <div style={{ position: 'absolute', bottom: '70px', left: '12px', right: '12px', backgroundColor: 'var(--bg-surface)', borderRadius: '16px', boxShadow: '0 -4px 30px rgba(0,0,0,0.15)', padding: '8px', zIndex: 1061 }} onClick={e => e.stopPropagation()}>
+          <div className="bottom-more-sheet" style={{ position: 'absolute', left: '12px', right: '12px', backgroundColor: 'var(--bg-surface)', borderRadius: '16px', boxShadow: '0 -4px 30px rgba(0,0,0,0.15)', padding: '8px', zIndex: 1061 }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 12px 8px' }}>
               <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.95rem' }}>{t('bottom_nav.more')}</span>
               <button onClick={() => setShowMore(false)} style={{ background: 'var(--bg-main)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <X size={14} color="var(--text-secondary)" />
               </button>
             </div>
+            <button type="button" className="bottom-profile" onClick={() => { setActiveTab('settings'); setShowMore(false); }}>
+              <span className="bottom-profile-avatar"><UserRound size={19} /></span>
+              <span><strong>{userName}</strong><small>{userRole === 'owner' ? 'Administrateur' : 'Gestionnaire'} · Voir le profil</small></span>
+            </button>
             {moreTabs.map(tab => (
               <NavItem key={tab.id} id={tab.id} icon={tab.icon} label={tab.label} isBig />
             ))}
+            <button type="button" className="bottom-logout" onClick={() => { setShowMore(false); onLogout?.(); }}><LogOut size={20} /><span>Se déconnecter</span></button>
           </div>
         </div>
       )}

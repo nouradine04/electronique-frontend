@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 // Query helpers are called during render, so stabilize equivalent queries.
 // Observe columns too: stock/price edits must refresh lists and totals.
-export function useQuery(query) {
+export function useQueryState(query) {
   const collection = query?.collection;
   const key = query ? JSON.stringify(query.description) : '';
   const stableQuery = useMemo(() => query, [collection, key]);
@@ -18,7 +18,11 @@ export function useQuery(query) {
     return () => subscription.unsubscribe();
   }, [stableQuery]);
 
-  if (result.query !== stableQuery) return [];
-  if (result.error) throw result.error;
-  return result.records;
+  if (result.query === stableQuery && result.error) throw result.error;
+  const loading = Boolean(stableQuery) && result.query !== stableQuery;
+  return { records: !stableQuery || loading ? [] : result.records, loading };
+}
+
+export function useQuery(query) {
+  return useQueryState(query).records;
 }

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useQuery } from '../db/useQuery.js';
 import { seedDefaultShopIfEmpty, queryAllShops, createShop, database } from '../db/queries.js';
-import { getPlanLimits, seedLocalDemoUsers } from '../services/localAuth.js';
+import { getPlanLimits, removeLegacyDemoUsers } from '../services/localAuth.js';
 
 const ShopContext = createContext();
 
@@ -9,6 +9,7 @@ export function ShopProvider({ children }) {
   const [currentShop, setCurrentShop] = useState(null);
   const [userRole, setUserRole] = useState(() => (localStorage.getItem('userRole') || 'manager').toLowerCase());
   const [userName, setUserName] = useState(() => localStorage.getItem('userName') || 'Utilisateur');
+  const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem('currentUserId') || '');
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Requête réactive sur toutes les boutiques (mise à jour automatique)
@@ -21,8 +22,7 @@ export function ShopProvider({ children }) {
     async function init() {
       // Crée la boutique par défaut si la DB est vide
       const shop = await seedDefaultShopIfEmpty();
-      await seedLocalDemoUsers(shop);
-
+      await removeLegacyDemoUsers();
       // Restaure la boutique sélectionnée
       const storedShopId = localStorage.getItem('currentShopId');
       setIsInitialized(true);
@@ -84,13 +84,14 @@ export function ShopProvider({ children }) {
     return newShop;
   };
 
-  const switchRole = (role, name) => {
+  const switchRole = (role, name, userId) => {
     role = role.toLowerCase();
     const displayName = name || (role === 'owner' ? 'Administrateur' : 'Gestionnaire');
     setUserRole(role);
     setUserName(displayName);
     localStorage.setItem('userRole', role);
     localStorage.setItem('userName', displayName);
+    if (userId) { setCurrentUserId(userId); localStorage.setItem('currentUserId', userId); }
   };
 
   const logout = () => {
@@ -98,9 +99,11 @@ export function ShopProvider({ children }) {
     localStorage.removeItem('userName');
     localStorage.removeItem('authToken');
     localStorage.removeItem('access_token');
+    localStorage.removeItem('currentUserId');
     sessionStorage.removeItem('encryption_pin');
     setUserRole('manager');
     setUserName('Utilisateur');
+    setCurrentUserId('');
   };
 
   return (
@@ -109,6 +112,7 @@ export function ShopProvider({ children }) {
       availableShops,
       userRole,
       userName,
+      currentUserId,
       isInitialized,
       switchRole,
       switchShop,

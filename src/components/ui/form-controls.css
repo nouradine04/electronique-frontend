@@ -1,0 +1,23 @@
+.ui-field { display: grid; gap: 7px; }
+.ui-field + .ui-field { margin-top: 18px; }
+.ui-field > label { color: var(--text-primary); font-size: 13px; font-weight: 700; line-height: 1.3; }
+.ui-optional { margin-left: 5px; color: var(--text-muted); font-size: 11px; font-weight: 500; }
+.ui-input-wrap { position: relative; }
+.ui-select-wrap { position: relative; }
+.ui-select-wrap::after { content: ''; position: absolute; right: 15px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--text-muted); border-bottom: 1.5px solid var(--text-muted); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.ui-select { appearance: none; padding-right: 38px; }
+.ui-input-icon { position: absolute; z-index: 1; left: 13px; top: 50%; display: grid; place-items: center; color: var(--text-muted); transform: translateY(-50%); pointer-events: none; }
+.ui-input { width: 100%; min-height: 48px; box-sizing: border-box; padding: 10px 13px; border: 1px solid var(--border-color); border-radius: 10px; outline: none; background: var(--bg-main); color: var(--text-primary); font: inherit; font-size: 16px; transition: border-color .18s, box-shadow .18s, background .18s; }
+.ui-input-wrap:has(.ui-input-icon) .ui-input { padding-left: 41px; }
+.ui-input:hover { border-color: color-mix(in srgb, var(--text-muted) 55%, var(--border-color)); }
+.ui-input:focus { border-color: var(--accent-primary); background: var(--bg-surface); box-shadow: 0 0 0 3px rgb(14 107 168 / 14%); }
+.ui-input[aria-invalid=true] { border-color: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 13%, transparent); }
+.ui-field-help, .ui-field-error { margin: 0; font-size: 11px; line-height: 1.4; }
+.ui-field-help { color: var(--text-muted); }.ui-field-error { color: var(--danger); font-weight: 650; }
+.ui-form-divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--text-muted); font-size: 11px; }
+.ui-form-divider::before, .ui-form-divider::after { content: ''; height: 1px; flex: 1; background: var(--border-color); }
+@media (max-width: 520px) {
+  .ui-field + .ui-field { margin-top: 15px; }
+  .ui-input { min-height: 50px; border-radius: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .ui-input { transition: none; } }
