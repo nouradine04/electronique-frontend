@@ -15,7 +15,7 @@ export function LandingNavbar(props: Props) {
   const toggle = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLElement>(null);
   const ar = props.isRtl;
-  const preferences = <><button onClick={props.onLanguage} aria-label="Changer la langue"><Globe size={16} /> {props.language.toUpperCase()}</button><button onClick={props.onTheme} aria-label="Changer le thème">{props.theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button></>;
+  const preferences = (className: string) => <div className={`public-preferences ${className}`}><button onClick={props.onLanguage} aria-label="Changer la langue"><Globe size={16} /><span>{props.language.toUpperCase()}</span></button><button onClick={props.onTheme} aria-label={props.theme === 'light' ? 'Activer le mode nuit' : 'Activer le mode clair'}>{props.theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}</button></div>;
   const links = [['features', ar ? 'المميزات' : 'Fonctionnalités'], ['pricing', ar ? 'الاشتراكات' : 'Tarifs'], ['download', ar ? 'التثبيت' : 'Installer'], ['contact', ar ? 'تواصل معنا' : 'Contact']];
   useEffect(() => {
     if (!open) return;
@@ -30,9 +30,10 @@ export function LandingNavbar(props: Props) {
       <button className="public-brand" aria-label={ar ? 'الصفحة الرئيسية' : 'Accueil'} onClick={() => { setOpen(false); props.onHome(); }}><img src={logo} alt="NStock" /></button>
       <nav className="public-desktop-links" aria-label={ar ? 'التنقل الرئيسي' : 'Navigation principale'}>{links.map(([id, label]) => <button key={id} onClick={() => props.onSection(id)}>{label}</button>)}</nav>
       <div className="public-nav-actions">
-        <div className="public-preferences public-desktop-preferences">{preferences}</div>
+        {preferences('public-desktop-preferences')}
         <button className="public-login" onClick={props.onLogin}>{ar ? 'دخول' : 'Connexion'}</button>
         <button className="public-create" onClick={props.onRegister}>{ar ? 'إنشاء متجر' : 'Créer ma boutique'}</button>
+        {preferences('public-mobile-quick')}
         <button className="public-menu-toggle" ref={toggle} aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'} aria-expanded={open} aria-controls="public-mobile-menu" onClick={() => setOpen(!open)}>{open ? <X size={22} /> : <Menu size={22} />}<span>{ar ? 'القائمة' : 'Menu'}</span></button>
       </div>
     </div>
@@ -40,7 +41,6 @@ export function LandingNavbar(props: Props) {
       <nav aria-label="Navigation mobile">{links.map(([id, label]) => <button key={id} onClick={() => { setOpen(false); props.onSection(id); }}>{label}</button>)}</nav>
       <button className="public-create" onClick={() => { setOpen(false); props.onRegister(); }}>{ar ? 'إنشاء متجر' : 'Créer ma boutique'}</button>
       <button className="public-login" onClick={() => { setOpen(false); props.onLogin(); }}>{ar ? 'دخول' : 'Se connecter'}</button>
-      <div className="public-preferences public-mobile-preferences">{preferences}</div>
     </div>
   </header>;
 }

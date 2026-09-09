@@ -5,12 +5,13 @@ import { LandingNavbar } from '../../components/LandingNavbar';
 import React, { useState, useEffect } from 'react';
 import { InstallApp } from '../../components/InstallApp';
 import './public-responsive.css';
+import './landing-flow.css';
 import { registerLocalShop } from '../../services/localAuth.js';
 import { useShop } from '../../context/ShopContext.jsx';
-import { 
-  Laptop, Tablet, Smartphone, ShieldCheck, Database, CheckCircle2, AlertCircle, ShoppingBag, 
-  ArrowRight, ShieldAlert, Cpu, Sparkles, Printer, Zap, RefreshCw, X, ChevronRight, Globe, Sun, Moon,
-  LayoutDashboard, Package, TrendingUp, User, ShoppingCart, Store, Mail, LockKeyhole
+import {
+  Smartphone, ShieldCheck, Database, CheckCircle2, AlertCircle,
+  ArrowRight, ArrowUp, Printer, Zap, X, Globe,
+  User, Store, Mail, LockKeyhole
 } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
 import painCahierImg from '../../assets/pain_cahier.jpg';
@@ -120,6 +121,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
   const [pricingPeriod, setPricingPeriod] = useState('monthly'); // 'monthly' | 'quarterly' | 'annual'
   const [currentView, setCurrentView] = useState('landing'); // 'landing' | 'contact'
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   const currentLang = i18n.language || 'fr';
   const isRtl = currentLang === 'ar';
@@ -128,6 +130,13 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const update = () => setShowBackToTop(window.scrollY > 650);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
 
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
@@ -354,7 +363,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
         onLanguage={toggleLanguage} onTheme={toggleTheme} />
 
       {/* Main Content */}
-      <main style={{ flex: 1, direction: isRtl ? 'rtl' : 'ltr' }}>
+      <main className="landing-main" style={{ flex: 1, direction: isRtl ? 'rtl' : 'ltr' }}>
         
         {currentView === 'contact' ? (
           /* DEDICATED CONTACT PAGE */
@@ -677,21 +686,6 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
           </div>
         </section>
 
-        {/* ABOUT / MISSION SECTION */}
-        <section id="about" className="landing-section" style={{ backgroundColor: 'var(--bg-surface)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '20px' }}>
-              Pourquoi NStock ?
-            </h2>
-            <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', lineHeight: '1.65', margin: '0 auto 32px', maxWidth: '650px' }}>
-              Continuez à vendre même sans connexion. Vos ventes, stocks, crédits et bénéfices restent simples à suivre depuis un seul espace.
-            </p>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: '700', color: BRAND }}>
-              La transition numérique simple, abordable et sécurisée.
-            </div>
-          </div>
-        </section>
-
         {/* DOWNLOAD SECTION */}
         <section id="download" className="landing-section" style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
@@ -931,7 +925,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
         </section>
 
         {/* FAQ SECTION */}
-        <section className="landing-section" style={{ backgroundColor: 'var(--bg-surface)', borderTop: '1px solid var(--border-color)' }}>
+        <section className="landing-section landing-faq" style={{ backgroundColor: 'var(--bg-surface)', borderTop: '1px solid var(--border-color)' }}>
           <div style={{ maxWidth: '800px', margin: '0 auto' }}>
             <h2 style={{ fontSize: '2.2rem', fontWeight: '800', textAlign: 'center', marginBottom: '16px' }}>
               Vous vous demandez peut-être…
@@ -971,26 +965,38 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
 
           </div>
         </section>
+
+        <section className="landing-final-cta" aria-labelledby="landing-final-title">
+          <div className="landing-final-card">
+            <div className="landing-final-copy">
+              <span className="landing-final-icon" aria-hidden="true"><Store size={25} /></span>
+              <h2 id="landing-final-title">Prêt à gérer votre boutique ?</h2>
+            </div>
+            <div className="landing-final-actions">
+              <button type="button" className="landing-final-primary" onClick={() => openRegistration('standard')}>Créer ma boutique <ArrowRight size={18} /></button>
+            </div>
+          </div>
+        </section>
       </>
     )}
   </main>
 
       {/* Footer */}
-      <footer style={{
-        textAlign: 'center',
-        padding: '32px 40px',
-        borderTop: '1px solid var(--border-color)',
-        fontSize: '12px',
-        color: 'var(--text-muted)',
-        backgroundColor: 'var(--bg-surface)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '16px' }}>
-          <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('features')}>Fonctionnalités</span>
-          <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('about')}>À Propos</span>
-          <span style={{ cursor: 'pointer' }} onClick={() => scrollToSection('pricing')}>Abonnement</span>
+      <footer className="landing-footer">
+        <div className="landing-footer-main">
+          <button type="button" className="landing-footer-brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><img src={logoImg} alt="NStock" /><span>Caisse et gestion de stock pour boutiques d’électronique.</span></button>
+          <nav aria-label="Navigation du pied de page">
+            <button type="button" onClick={() => scrollToSection('features')}>Fonctionnalités</button>
+            <button type="button" onClick={() => scrollToSection('pricing')}>Abonnement</button>
+            <button type="button" onClick={() => scrollToSection('download')}>Installer</button>
+            <button type="button" onClick={() => setCurrentView('contact')}>Contact</button>
+          </nav>
+          <button type="button" className="landing-footer-login" onClick={() => onNavigate('login')}>Se connecter <ArrowRight size={16} /></button>
         </div>
-        &copy; {new Date().getFullYear()} NStock. Tous droits réservés. Caisse intelligente sécurisée hors-ligne.
+        <div className="landing-footer-bottom"><span>&copy; {new Date().getFullYear()} NStock. Tous droits réservés.</span><span>Simple · sécurisé · disponible hors connexion</span></div>
       </footer>
+
+      {showBackToTop && <button type="button" className="landing-back-top" aria-label="Revenir en haut de la page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><ArrowUp size={20} /></button>}
 
       {/* REGISTRATION MODAL */}
       {showRegisterModal && (

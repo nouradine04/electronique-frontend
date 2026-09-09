@@ -22,14 +22,26 @@
 @media(min-width: 1001px) { .public-menu { display: none; } }
 .public-mobile-preferences { justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px; }
 .public-mobile-preferences button { min-height: 44px; }
+.public-mobile-quick { display: none; }
 @media(max-width: 1100px) { .public-desktop-preferences { display: none; } }
 @media(max-width: 1000px) {
   .public-desktop-links, .public-nav-actions > .public-create, .public-nav-actions > .public-login, .public-desktop-preferences { display: none; }
   .public-nav .public-menu-toggle { display: flex; width: auto; gap: 8px; padding: 0 12px; border: 0; color: var(--text-primary); font-weight: 500; }
   .public-nav-inner { justify-content: space-between; padding: 0 16px; gap: 12px; min-height: 72px; }
   .public-brand img { width: clamp(88px, 24vw, 108px); height: 72px; }
-  .public-nav-actions { gap: 0; }
+  .public-nav-actions { gap: 2px; }
+  .public-mobile-quick { display: flex; }
+  .public-mobile-quick button { width: 38px; height: 42px; min-height: 42px; padding: 0; justify-content: center; }
+  .public-mobile-quick button:first-child { width: 50px; }
+  .public-mobile-quick button span { font-size: 10px; }
   .public-menu { position: absolute; top: 100%; inset-inline: 0; background: var(--bg-surface); padding: 12px 20px 20px; box-shadow: 0 12px 18px rgba(15,23,42,.08); max-height: calc(100dvh - 72px); overflow-y: auto; }
   .public-menu nav button { min-height: 48px; border-radius: 0; border-bottom: 1px solid var(--border-color); }
   .public-menu > .public-login { margin-top: 8px; }
+}
+@media(max-width:390px) {
+  .public-nav-inner { padding-inline: 10px; gap: 5px; }
+  .public-brand img { width: 80px; }
+  .public-nav .public-menu-toggle { width: 40px; padding: 0; }
+  .public-menu-toggle span { display: none; }
+  .public-mobile-quick button:first-child { width: 42px; }
 }

@@ -131,7 +131,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
         }}>
           
           <div className="login-brand-mobile"><img src={logoImg} alt="NStock" /><span>Votre boutique, à portée de main.</span></div>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div className="login-card-heading" style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
               Bienvenue
             </h2>
@@ -187,7 +187,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
               type="submit"
               loading={loading}
               className="btn btn-primary"
-              style={{ width: '100%', minHeight: '48px', marginTop: '24px', fontSize: '1rem', fontWeight: 600 }}
+              style={{ width: '100%', minHeight: '46px', marginTop: '20px', fontSize: '0.95rem', fontWeight: 600 }}
             >
               Se connecter
             </LoadingButton>
@@ -196,7 +196,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
             <GoogleSignInButton onVerified={completeGoogleLogin} onError={setError} />
             
             {onNavigate && (
-              <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.875rem' }}>
+              <div className="login-card-links" style={{ textAlign: 'center', marginTop: '16px', fontSize: '0.875rem' }}>
                 Pas encore de boutique ?{' '}
                 <button
                   type="button"

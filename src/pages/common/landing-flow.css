@@ -1,0 +1,84 @@
+.landing-main { overflow: hidden; }
+
+/* A wide, deliberate rhythm makes each idea read as its own chapter. */
+.landing-main .landing-section { padding-block: clamp(92px, 10vw, 136px); padding-inline: clamp(20px, 5vw, 64px); }
+.landing-main .landing-section > div { width: 100%; }
+.landing-main .landing-section h2 { letter-spacing: -.035em; line-height: 1.12; text-wrap: balance; }
+.landing-main .landing-section p { text-wrap: pretty; }
+.landing-main #pain-points > div:first-child { margin-bottom: 88px !important; }
+.landing-main .pain-container { gap: 120px; padding: 0; }
+.landing-main .pain-row { gap: clamp(54px, 8vw, 104px); }
+.landing-main .pain-image-box { max-width: 500px; border-radius: 24px; box-shadow: 0 28px 70px rgba(15, 23, 42, .13); }
+.landing-main .pain-image-box img { height: clamp(300px, 30vw, 380px); }
+.landing-main .pain-text-box { max-width: 490px; }
+.landing-main #features > div,
+.landing-main #pricing > div,
+.landing-main #download > div { max-width: 1120px !important; }
+.landing-main #features .hover-scale { min-height: 265px; border-radius: 20px !important; padding: 36px !important; }
+.landing-main .landing-faq > div { max-width: 860px !important; }
+.landing-main .landing-faq h2 { font-size: clamp(2.1rem, 4.5vw, 3.5rem) !important; }
+
+.landing-final-cta { padding: 8px clamp(20px, 5vw, 64px) clamp(76px, 9vw, 112px); background: var(--bg-surface); }
+.landing-final-card { width: min(980px, 100%); min-height: 0; margin: 0 auto; padding: clamp(28px, 4vw, 44px); display: flex; align-items: center; justify-content: space-between; gap: 36px; border-radius: 22px; color: white; background: linear-gradient(135deg, #0b527f, #0e6ba8 65%, #1683c8); box-shadow: 0 24px 58px rgba(14,107,168,.2); }
+.landing-final-copy { min-width: 0; display: flex; align-items: center; gap: 16px; }
+.landing-final-icon { width: 48px; height: 48px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.24); border-radius: 14px; background: rgba(255,255,255,.12); }
+.landing-final-copy h2 { max-width: 560px; margin: 0; color: white; font-size: clamp(1.75rem, 4vw, 3rem); line-height: 1.05; letter-spacing: -.045em; text-wrap: balance; }
+.landing-final-actions { position: relative; z-index: 2; flex: 0 0 220px; display: grid; gap: 10px; }
+.landing-final-actions button { min-height: 52px; padding: 0 20px; border-radius: 11px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.landing-final-primary { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 0; background: white; color: #0e6ba8; box-shadow: 0 12px 28px rgba(4, 31, 49, .15); }
+.landing-final-actions button:hover { transform: translateY(-2px); }
+.landing-final-actions button:focus-visible { outline: 3px solid white; outline-offset: 3px; }
+
+.landing-footer { padding: 48px clamp(20px,5vw,64px) 24px; border-top: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); }
+.landing-footer-main { width: min(1180px,100%); margin: 0 auto 38px; display: grid; grid-template-columns: minmax(220px,1fr) auto minmax(150px,1fr); align-items: center; gap: 36px; }
+.landing-footer button { min-height: 44px; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.landing-footer-brand { padding: 0; display: grid; justify-items: start; text-align: start; }
+.landing-footer-brand img { width: 112px; height: 64px; object-fit: contain; object-position: left center; }
+.landing-footer-brand span { max-width: 270px; font-size: 12px; line-height: 1.5; }
+.landing-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; }
+.landing-footer nav button { font-size: 13px; }
+.landing-footer nav button:hover { color: #0e6ba8; }
+.landing-footer-login { justify-self: end; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border: 1px solid var(--border-color) !important; border-radius: 10px; color: var(--text-primary) !important; font-weight: 650 !important; }
+.landing-footer-bottom { width: min(1180px,100%); margin: auto; padding-top: 20px; display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; }
+.landing-back-top { position: fixed; z-index: 90; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 46px; height: 46px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; background: #0e6ba8; color: white; box-shadow: 0 10px 28px rgba(14,107,168,.3); cursor: pointer; animation: landing-back-enter .25s ease both; }
+.landing-back-top:focus-visible { outline: 3px solid #0e6ba8; outline-offset: 3px; }
+@keyframes landing-back-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 800px) {
+  .landing-main .landing-section { padding-block: 76px; }
+  .landing-main #pain-points > div:first-child { margin-bottom: 58px !important; }
+  .landing-main .pain-container { gap: 82px; }
+  .landing-main .pain-row { gap: 34px; }
+  .landing-main .pain-image-box img { height: 280px; }
+  .landing-main #features .hover-scale { min-height: auto; }
+  .landing-final-cta { padding-top: 4px; padding-bottom: 76px; }
+  .landing-final-card { padding: 34px 28px; align-items: stretch; flex-direction: column; gap: 26px; border-radius: 20px; }
+  .landing-final-actions { flex: none; width: 100%; }
+  .landing-footer-main { grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 24px; }
+  .landing-footer-brand { justify-items: center; text-align: center; }
+  .landing-footer-brand img { object-position: center; }
+  .landing-footer-login { justify-self: center; }
+}
+
+@media (max-width: 520px) {
+  .landing-main .landing-section { padding: 58px 18px !important; }
+  .landing-main .landing-section h2 { font-size: 2rem !important; }
+  .landing-main .landing-section p { font-size: .98rem !important; }
+  .landing-main .pain-container { gap: 68px; }
+  .landing-main .pain-image-box { border-radius: 18px; box-shadow: 0 18px 42px rgba(15,23,42,.12); }
+  .landing-main .pain-image-box img { height: 230px; }
+  .landing-main .pain-title-highlight { font-size: 1.55rem; }
+  .landing-final-cta { padding: 4px 14px 62px; }
+  .landing-final-card { padding: 32px 22px; border-radius: 22px; }
+  .landing-final-copy { align-items: center; }
+  .landing-final-icon { width: 44px; height: 44px; }
+  .landing-final-copy h2 { font-size: clamp(1.7rem, 9vw, 2.35rem); }
+  .landing-final-actions button { min-height: 50px; }
+  .landing-footer { padding: 38px 20px 20px; }
+  .landing-footer nav { max-width: 290px; }
+  .landing-footer-bottom { align-items: center; flex-direction: column; text-align: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-final-actions button { transition: none; }
+}
