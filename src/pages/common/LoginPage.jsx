@@ -2,13 +2,17 @@ import { Reveal } from '../../components/Reveal';
 import React, { useState } from 'react';
 import { Lock, UserRound } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
-import { loginLocalGoogleUser, loginLocalUser } from '../../services/localAuth.js';
+import { loginLocalGoogleUser, loginLocalUser, restoreLocalOwnerFromCloud } from '../../services/localAuth.js';
+import { ensureCloudOwnerAccount, loginCloudAccount } from '../../services/cloudAuth';
+import database from '../../db/watermelondb.js';
 import logoImg from '../../assets/logo.png';
 import './public-responsive.css';
 import { LoadingButton } from '../../components/forms/FormUI';
 import { GoogleSignInButton } from '../../components/auth/GoogleSignInButton';
 import { FormDivider, FormField, FormInput } from '../../components/ui/FormControls';
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
+import { closeDesktopVault, isTauriDesktop, openDesktopVault } from '../../services/desktopVault';
+import { restoreWatermelonFromDesktop, startDesktopBackupForShop } from '../../services/desktopBackup';
 
 export function LoginPage({ onLoginSuccess, onNavigate }) {
   const { switchRole, switchShop } = useShop();
@@ -25,15 +29,41 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
     setError('');
 
     try {
-      const user = await loginLocalUser(identifier, password);
+      let user;
+      if (isTauriDesktop()) {
+        await openDesktopVault(identifier, password);
+        try {
+          user = await loginLocalUser(identifier, password);
+        } catch (localError) {
+          const restored = await restoreWatermelonFromDesktop();
+          if (!restored) throw localError;
+          user = await loginLocalUser(identifier, password);
+        }
+      } else {
+        try {
+          user = await loginLocalUser(identifier, password);
+        } catch (localError) {
+          const cloudSession = await loginCloudAccount(identifier, password).catch(() => null);
+          if (!cloudSession) throw localError;
+          user = await restoreLocalOwnerFromCloud(cloudSession, password);
+        }
+      }
+      const localShop = await database.get('shops').find(user.shopId);
+      if (String(user.role).toLowerCase() === 'owner') {
+        await ensureCloudOwnerAccount(localShop, user, password).catch(cloudError => {
+          console.warn('[Compte cloud] Connexion différée.', cloudError.message);
+        });
+      }
       const { role, name } = user;
       await switchShop(user.shopId);
+      await startDesktopBackupForShop(user.shopId);
       sessionStorage.setItem('encryption_pin', password);
       switchRole(role, name, user.id);
       setLoading(false);
       onLoginSuccess(role);
 
     } catch (err) {
+      if (isTauriDesktop()) void closeDesktopVault();
       setError(err.message || 'Erreur lors de la connexion');
       setLoading(false);
     }
@@ -42,12 +72,28 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
   const completeGoogleLogin = async profile => {
     setLoading(true); setError('');
     try {
-      const user = await loginLocalGoogleUser(profile.email);
+      let user;
+      if (isTauriDesktop()) {
+        await openDesktopVault(profile.email, profile.sub);
+        try {
+          user = await loginLocalGoogleUser(profile.email);
+        } catch (localError) {
+          const restored = await restoreWatermelonFromDesktop();
+          if (!restored) throw localError;
+          user = await loginLocalGoogleUser(profile.email);
+        }
+      } else {
+        user = await loginLocalGoogleUser(profile.email);
+      }
       await switchShop(user.shopId);
+      await startDesktopBackupForShop(user.shopId);
       sessionStorage.setItem('encryption_pin', profile.sub);
       switchRole(user.role, user.name, user.id);
       onLoginSuccess(user.role);
-    } catch (loginError) { setError(loginError.message || 'Connexion Google impossible.'); }
+    } catch (loginError) {
+      if (isTauriDesktop()) void closeDesktopVault();
+      setError(loginError.message || 'Connexion Google impossible.');
+    }
     finally { setLoading(false); }
   };
 
@@ -133,11 +179,8 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
           <div className="login-brand-mobile"><img src={logoImg} alt="NStock" /><span>Votre boutique, à portée de main.</span></div>
           <div className="login-card-heading" style={{ textAlign: 'center', marginBottom: '32px' }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-              Bienvenue
+              Connexion
             </h2>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              Connectez-vous pour accéder à votre tableau de bord.
-            </p>
           </div>
 
           {error && identifier && password && (
@@ -156,7 +199,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
 
           <form onSubmit={handleSubmit} noValidate>
             
-            <FormField id="login-identifier" label="Email ou numéro de téléphone" error={error && !identifier ? 'Saisissez votre email ou votre numéro.' : null}>
+            <FormField id="login-identifier" label="Email ou téléphone" error={error && !identifier ? 'Champ obligatoire.' : null}>
                 <FormInput
                   id="login-identifier"
                   leadingIcon={<UserRound size={18} />}
@@ -165,12 +208,12 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
                   autoComplete="username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="email@exemple.com ou +221…"
+                  placeholder="Email ou téléphone"
                   aria-invalid={Boolean(error) && !identifier}
                 />
             </FormField>
 
-            <FormField id="login-password" label="Mot de passe" error={error && !password ? 'Saisissez votre mot de passe.' : null}>
+            <FormField id="login-password" label="Mot de passe" error={error && !password ? 'Champ obligatoire.' : null}>
                 <FormInput
                   id="login-password"
                   leadingIcon={<Lock size={18} />}

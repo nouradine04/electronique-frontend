@@ -7,35 +7,90 @@
  * 3. L'icône header reflète l'état : vert=ok, orange=pending, rouge=offline
  */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getUnsyncedRecords, markAsSynced } from '../db/queries';
+import { getUnsyncedCount, getUnsyncedRecords, markAsSynced } from '../db/queries';
 import { LOCAL_ONLY } from './backendConfig';
 import { useShop } from './ShopContext.jsx';
 import { pullChanges, pushChanges } from '../services/syncService';
+import { applyRemoteChanges } from '../services/applyRemoteChanges.js';
 
 const SyncContext = createContext();
 
 const RETRY_INTERVAL = 15000; // 15s entre les tentatives
 const SYNC_ON_FOCUS = true;   // Re-sync quand l'onglet devient actif
+const SYNC_BATCH_SIZE = 500;
+const MAX_PUSH_BATCHES_PER_RUN = 10;
+const cloudImage = value => /^https?:\/\//i.test(String(value || '')) ? value : undefined;
+
+const payloadStateKeys = {
+  users: 'users',
+  shops: 'shops',
+  categories: 'categories',
+  products: 'products',
+  clients: 'clients',
+  sales: 'sales',
+  payments: 'payments',
+  stock_movements: 'stockMovements',
+  returns: 'returns',
+  expenses: 'expenses',
+  invoices: 'invoices',
+};
+
+function finalizePayloadStates(payload, batch) {
+  for (const [table, stateKey] of Object.entries(payloadStateKeys)) {
+    const state = batch.changeStates[stateKey];
+    const rows = payload[table].created;
+    const updatedIds = new Set(state.updated.map(record => record.id));
+    const versions = new Map(
+      [...state.created, ...state.updated].map(record => [record.id, Number(record._raw.version) || 0]),
+    );
+    const serialized = rows.map(row => ({ ...row, version: versions.get(row.id) || 0 }));
+    payload[table] = {
+      created: serialized.filter(row => !updatedIds.has(row.id)),
+      updated: serialized.filter(row => updatedIds.has(row.id)),
+      deleted: state.deleted,
+    };
+  }
+  return payload;
+}
 
 export function SyncProvider({ children }) {
-  const { currentShop } = useShop();
+  const { currentShop, userRole } = useShop();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const retryTimer = useRef(null);
+  const syncLock = useRef(false);
 
   // Mise à jour du compteur de pending en temps réel
   const refreshPendingCount = useCallback(async () => {
     try {
-      const unsynced = await getUnsyncedRecords();
-      setPendingCount(unsynced.total);
+      if (!currentShop) {
+        setPendingCount(0);
+        return;
+      }
+      setPendingCount(await getUnsyncedCount(currentShop.id, userRole === 'owner'));
     } catch (e) {
       // DB pas encore prête
     }
-  }, []);
+  }, [currentShop, userRole]);
 
-  const buildChangesPayload = useCallback((unsynced) => ({
+  const buildChangesPayload = useCallback((unsynced) => finalizePayloadStates({
+    users: {
+      created: unsynced.users.map(user => ({
+        id: user.id,
+        shop_id: user.shopId,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        password_hash: user.passwordHash,
+        password_salt: user.passwordSalt,
+        password_algorithm: 'PBKDF2-SHA256-210000',
+        is_active: user.isActive,
+      })),
+      updated: [], deleted: [],
+    },
     shops: {
       created: unsynced.shops.map(s => ({
         id: s.id,
@@ -45,6 +100,15 @@ export function SyncProvider({ children }) {
         nif: s.nif,
         email: s.email,
         logo_url: s.logoUrl,
+      })),
+      updated: [],
+      deleted: [],
+    },
+    categories: {
+      created: unsynced.categories.map(category => ({
+        id: category.id,
+        shop_id: category.shopId,
+        name: category.name,
       })),
       updated: [],
       deleted: [],
@@ -61,7 +125,7 @@ export function SyncProvider({ children }) {
         quantity: p.quantity,
         min_stock: p.minStock,
         status: p.status,
-        image_url: p.imageUrl,
+        image_url: cloudImage(p.imageUrl),
         location: p.location,
         unit_cost: p.unitCost,
         catalog_id: p.catalogId,
@@ -177,62 +241,74 @@ export function SyncProvider({ children }) {
       updated: [],
       deleted: [],
     },
-  }), []);
+    invoices: {
+      created: unsynced.invoices.map(invoice => ({
+        id: invoice.id,
+        shop_id: invoice.shopId,
+        client_id: invoice.clientId,
+        client_name: invoice.clientName,
+        amount: invoice.amount,
+        status: invoice.status,
+        date_emission: invoice.dateEmission,
+        date_echeance: invoice.dateEcheance,
+        items_json: invoice.itemsJson,
+      })),
+      updated: [],
+      deleted: [],
+    },
+  }, unsynced), []);
 
   // Sync principale : push local → NestJS, pull NestJS → local
   const syncWithBackend = useCallback(async () => {
-    if (LOCAL_ONLY || !navigator.onLine || isSyncing || !currentShop) return;
+    if (LOCAL_ONLY || !navigator.onLine || syncLock.current || !currentShop) return;
 
+    syncLock.current = true;
     setIsSyncing(true);
     try {
-      const unsynced = await getUnsyncedRecords();
-      if (unsynced.total === 0) {
-        setPendingCount(0);
-        setIsSyncing(false);
-        return;
-      }
-
       const tenantId = currentShop.accountId || currentShop.id;
-      let pushCursor = null;
-      do {
+      const cursorKey = `lastPulledAt:${tenantId}:${currentShop.id}`;
+      const storedPullTimestamp = Number(localStorage.getItem(cursorKey) || 0);
+      for (let batchIndex = 0; batchIndex < MAX_PUSH_BATCHES_PER_RUN; batchIndex += 1) {
+        const batch = await getUnsyncedRecords(
+          currentShop.id,
+          userRole === 'owner',
+          SYNC_BATCH_SIZE,
+        );
+        if (batch.total === 0) break;
+
         const response = await pushChanges({
-          changes: buildChangesPayload(unsynced),
-          lastPulledAt: Number(localStorage.getItem('lastPulledAt') || 0),
+          changes: buildChangesPayload(batch),
+          lastPulledAt: storedPullTimestamp,
           tenantId,
           shopId: currentShop.id,
-          cursor: pushCursor,
-          limit: 500,
+          limit: SYNC_BATCH_SIZE,
         });
-        pushCursor = response.next_cursor;
-      } while (pushCursor);
-
-      await markAsSynced([
-        ...unsynced.shops,
-        ...unsynced.products,
-        ...unsynced.clients,
-        ...unsynced.sales,
-        ...unsynced.payments,
-        ...unsynced.stockMovements,
-        ...unsynced.returns,
-        ...unsynced.expenses,
-      ]);
+        if (response.has_more || response.processed !== batch.total) {
+          throw new Error('Le serveur n’a pas confirmé la totalité du lot de synchronisation.');
+        }
+        const rejectedIds = response.rejected_ids || {};
+        const rejectedCount = Object.values(rejectedIds)
+          .reduce((total, ids) => total + ids.length, 0);
+        await markAsSynced(batch, rejectedIds);
+        if (rejectedCount > 0) break;
+      }
 
       let pullCursor = null;
-      let pulledAt = Number(localStorage.getItem('lastPulledAt') || 0);
       let finalPullTimestamp = null;
       do {
         const response = await pullChanges({
-          lastPulledAt: pulledAt,
+          lastPulledAt: storedPullTimestamp,
           tenantId,
           shopId: currentShop.id,
           cursor: pullCursor,
-          limit: 500,
+          limit: SYNC_BATCH_SIZE,
         });
+        await applyRemoteChanges(response.changes);
         finalPullTimestamp = response.timestamp;
         pullCursor = response.next_cursor;
       } while (pullCursor);
       if (finalPullTimestamp) {
-        localStorage.setItem('lastPulledAt', String(finalPullTimestamp));
+        localStorage.setItem(cursorKey, String(finalPullTimestamp));
       }
 
       setLastSyncedAt(new Date());
@@ -241,9 +317,10 @@ export function SyncProvider({ children }) {
     } catch (err) {
       console.warn('[Sync] Échec — données conservées localement:', err.message);
     } finally {
+      syncLock.current = false;
       setIsSyncing(false);
     }
-  }, [buildChangesPayload, currentShop, isSyncing, refreshPendingCount]);
+  }, [buildChangesPayload, currentShop, refreshPendingCount, userRole]);
 
   // Écoute online/offline
   useEffect(() => {
@@ -273,6 +350,12 @@ export function SyncProvider({ children }) {
       if (retryTimer.current) clearInterval(retryTimer.current);
     };
   }, [isOnline, syncWithBackend]);
+
+  // Synchronisation immédiate à l'ouverture d'une boutique. Les retries et
+  // l'événement `online` prennent ensuite le relais sans demander à l'utilisateur.
+  useEffect(() => {
+    if (!LOCAL_ONLY && isOnline && currentShop) void syncWithBackend();
+  }, [currentShop, isOnline, syncWithBackend]);
 
   // Re-sync au focus de l'onglet
   useEffect(() => {

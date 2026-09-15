@@ -69,6 +69,11 @@ export function PosPage({ setActiveTab }) {
     [currentShop?.id]
   ) || [];
 
+  const productsById = useMemo(() => new Map(allProducts.map(product => [product.id, product])), [allProducts]);
+  const cartItems = useMemo(() => cart
+    .map(item => ({ ...item, product: productsById.get(item.productId) }))
+    .filter(item => item.product), [cart, productsById]);
+
   const filteredProducts = useMemo(() => {
     const q = (searchQuery || '').toLowerCase();
     return allProducts.filter(p => {
@@ -90,35 +95,35 @@ export function PosPage({ setActiveTab }) {
   }, [allClients, clientSearch]);
 
   const cartTotal = useMemo(() =>
-    cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
-    [cart]
+    cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
+    [cartItems]
   );
 
   const addToCart = useCallback((product) => {
     setCart(prev => {
-      const existing = prev.find(i => i.product.id === product.id);
+      const existing = prev.find(i => i.productId === product.id);
       if (existing) {
         if (existing.quantity >= product.quantity) return prev;
-        return prev.map(i => i.product.id === product.id
+        return prev.map(i => i.productId === product.id
           ? { ...i, quantity: i.quantity + 1 } : i);
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { productId: product.id, quantity: 1 }];
     });
   }, []);
 
   const updateQty = useCallback((productId, delta) => {
     setCart(prev => prev
-      .map(i => i.product.id === productId ? { ...i, quantity: i.quantity + delta } : i)
+      .map(i => i.productId === productId ? { ...i, quantity: i.quantity + delta } : i)
       .filter(i => i.quantity > 0)
     );
   }, []);
 
   const removeFromCart = useCallback((productId) => {
-    setCart(prev => prev.filter(i => i.product.id !== productId));
+    setCart(prev => prev.filter(i => i.productId !== productId));
   }, []);
 
   const finalizeCheckout = async () => {
-    if (cart.length === 0 || checkoutLock.current) return;
+    if (cartItems.length === 0 || checkoutLock.current) return;
     checkoutLock.current = true;
     setIsCheckingOut(true);
 
@@ -141,7 +146,7 @@ export function PosPage({ setActiveTab }) {
           throw new Error('Le montant reçu doit être compris entre zéro et le total.');
         }
         // Validate the whole cart inside the writer before preparing mutations.
-        for (const item of cart) {
+        for (const item of cartItems) {
           if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > item.product.quantity) {
             throw new Error(`Stock insuffisant pour ${item.product.name}.`);
           }
@@ -161,7 +166,7 @@ export function PosPage({ setActiveTab }) {
           operations.push(newClient);
           finalClientId = newClient.id;
         }
-        for (const item of cart) {
+        for (const item of cartItems) {
           operations.push(database.get('stock_movements').prepareCreate(m => {
             m.productId = item.product.id;
             m.shopId = currentShop.id;
@@ -212,7 +217,7 @@ export function PosPage({ setActiveTab }) {
         saleIds,
         clientName: finalClientName,
         clientPhone: finalClientPhone,
-        items: [...cart],
+        items: cartItems.map(item => ({ ...item })),
         total: cartTotal,
         amountReceived: paymentMethod === 'credit' ? Number(amountReceived) : cartTotal,
         remainingDebt: paymentMethod === 'credit' ? cartTotal - Number(amountReceived) : 0,
@@ -221,6 +226,7 @@ export function PosPage({ setActiveTab }) {
       });
 
       setCart([]);
+      setShowCartSheet(false);
       setShowPaymentModal(false);
       setShowInlineInvoice(false);
 
@@ -337,7 +343,7 @@ export function PosPage({ setActiveTab }) {
                     </div>
                   </div>
                   <div style={{ height: '3px', backgroundColor: BRAND, opacity: 0.2 }} />
-                  <span className="pos-add-label"><Plus size={14} /> Ajouter{cart.find(item => item.product.id === product.id) ? ` · ${cart.find(item => item.product.id === product.id).quantity} au panier` : ''}</span>
+                  <span className="pos-add-label"><Plus size={14} /> Ajouter{cart.find(item => item.productId === product.id) ? ` · ${cart.find(item => item.productId === product.id).quantity} au panier` : ''}</span>
                 </button>
               ))}
             </div>
@@ -366,7 +372,7 @@ export function PosPage({ setActiveTab }) {
                 <p style={{ fontSize: '14px' }}>Cliquez sur un produit pour l'ajouter</p>
               </div>
             ) : (
-              cart.map(item => (
+              cartItems.map(item => (
                 <div key={item.product.id} className="pos-cart-item">
                   <span className="pos-cart-photo"><LocalImage src={item.product.imageUrl || item.product.image_url} alt="" fallback={<Package size={18} />} /></span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -426,6 +432,32 @@ export function PosPage({ setActiveTab }) {
           {cart.reduce((s, i) => s + i.quantity, 0)} article{cart.length > 1 ? 's' : ''} —&nbsp;
           {cartTotal.toLocaleString('fr-FR')} FCFA
         </button>
+      )}
+
+      {isMobile && showCartSheet && (
+        <div className="pos-mobile-cart-overlay" onClick={event => event.target === event.currentTarget && setShowCartSheet(false)}>
+          <section className="pos-mobile-cart" aria-label="Panier">
+            <header>
+              <div><ShoppingCart size={19} /><strong>Panier</strong></div>
+              <button type="button" onClick={() => setShowCartSheet(false)} aria-label="Fermer"><X size={20} /></button>
+            </header>
+            <div className="pos-mobile-cart-items">
+              {cartItems.map(item => <article key={item.productId}>
+                <span className="pos-cart-photo"><LocalImage src={item.product.imageUrl || item.product.image_url} alt="" fallback={<Package size={18} />} /></span>
+                <div><strong>{item.product.name}</strong><small>{variantLabel(item.product)}</small><b>{(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA</b></div>
+                <div className="pos-mobile-quantity">
+                  <button type="button" onClick={() => updateQty(item.productId, -1)}><Minus size={14} /></button>
+                  <span>{item.quantity}</span>
+                  <button type="button" onClick={() => updateQty(item.productId, 1)} disabled={item.quantity >= item.product.quantity}><Plus size={14} /></button>
+                </div>
+              </article>)}
+            </div>
+            <footer>
+              <div><span>Total</span><strong>{cartTotal.toLocaleString('fr-FR')} FCFA</strong></div>
+              <button type="button" className="btn btn-primary" onClick={() => { setShowCartSheet(false); setShowPaymentModal(true); }}>Encaisser</button>
+            </footer>
+          </section>
+        </div>
       )}
 
       {/* ── Payment Modal ── */}

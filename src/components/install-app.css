@@ -9,5 +9,8 @@
 .install-detail > small { color: var(--text-muted); font-size: 12px; }
 .install-detail p { max-width: 440px; margin: 16px auto; font-size: 14px; }
 .install-detail .btn { padding: 12px 24px; border-radius: 28px; min-height: 48px; margin-top: 6px; }
+.desktop-platform-choice { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; margin: -2px 0 14px; color: var(--text-muted); font-size: 12px; }
+.desktop-platform-choice button { min-height: 30px; padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-main); color: var(--text-secondary); font: inherit; font-weight: 700; cursor: pointer; }
+.desktop-platform-choice button[aria-pressed=true] { border-color: #0e6ba8; color: #0e6ba8; background: rgba(14,107,168,.08); }
 .install-detail [role=status] { text-align: start; background: var(--bg-main); padding: 14px; border-radius: 10px; }
 @media(max-width:600px) { .install-detail { padding: 24px 18px; } .install-detail h3 { font-size: 22px; } .install-choices { gap: 6px; } .install-choices button { flex-direction: column; font-size: 11px; gap: 7px; padding-inline: 4px; } .install-detail .btn { width: 100%; justify-content: center; } }

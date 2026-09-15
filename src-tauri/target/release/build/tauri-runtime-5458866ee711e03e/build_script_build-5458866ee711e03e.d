@@ -1,0 +1,5 @@
+/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/tauri-runtime-5458866ee711e03e/build_script_build-5458866ee711e03e.d: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.11.3/build.rs
+
+/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/tauri-runtime-5458866ee711e03e/build_script_build-5458866ee711e03e: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.11.3/build.rs
+
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-runtime-2.11.3/build.rs:

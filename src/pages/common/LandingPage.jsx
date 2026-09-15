@@ -7,6 +7,9 @@ import { InstallApp } from '../../components/InstallApp';
 import './public-responsive.css';
 import './landing-flow.css';
 import { registerLocalShop } from '../../services/localAuth.js';
+import { closeDesktopVault, isTauriDesktop, openDesktopVault } from '../../services/desktopVault';
+import { startDesktopBackupForShop } from '../../services/desktopBackup';
+import { ensureCloudOwnerAccount } from '../../services/cloudAuth';
 import { useShop } from '../../context/ShopContext.jsx';
 import {
   Smartphone, ShieldCheck, Database, CheckCircle2, AlertCircle,
@@ -170,8 +173,8 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
   };
 
   const goToCredentials = () => {
-    if (!shopName.trim() || !adminName.trim()) {
-      setError('Indiquez le nom de la boutique et votre nom.');
+    if (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
+      setError('Indiquez votre nom et une adresse email valide.');
       return;
     }
     setError('');
@@ -183,8 +186,8 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
     setLoading(true);
     setError('');
 
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      setError('Saisissez une adresse email valide.');
+    if (!shopName.trim()) {
+      setError('Indiquez le nom de votre boutique.');
       setLoading(false);
       return;
     }
@@ -197,6 +200,10 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
     try {
       const shopCode = shopName.toUpperCase().replace(/\s+/g, '').slice(0, 4) + Math.floor(1000 + Math.random() * 9000);
 
+      if (isTauriDesktop()) {
+        await openDesktopVault(email || phone, password);
+      }
+
       const { shop: newShop, user: newUser } = await registerLocalShop({
         name: shopName,
         code: shopCode,
@@ -207,14 +214,22 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
         subscriptionPlan: selectedPlan,
       });
 
+      // La création locale reste prioritaire. Si le réseau est disponible, le
+      // compte de récupération et le jeton de sync sont créés immédiatement.
+      await ensureCloudOwnerAccount(newShop, newUser, password).catch(cloudError => {
+        console.warn('[Compte cloud] Création reportée à la prochaine connexion.', cloudError.message);
+      });
+
       sessionStorage.setItem('encryption_pin', password);
       await switchShop(newShop.id);
+      await startDesktopBackupForShop(newShop.id);
       switchRole('owner', adminName, newUser.id);
       
       setLoading(false);
       setShowRegisterModal(false);
       onLoginSuccess('owner');
     } catch (err) {
+      if (isTauriDesktop()) void closeDesktopVault();
       console.error(err);
       setError(err.message || 'Une erreur est survenue lors de la création de la boutique.');
       setLoading(false);
@@ -1033,44 +1048,13 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
 
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <h2 style={{ fontSize: '22px', fontWeight: '900', margin: '0 0 6px 0', letterSpacing: '-0.5px' }}>
-                Créer votre Caisse
+                Créer votre boutique
               </h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-                Initialisez votre caisse chiffrée. 15 jours d’essai gratuit.
-              </p>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '5px', borderRadius: '11px', background: 'var(--bg-main)', marginBottom: '18px' }}>
-              {[
-                { id: 'standard', label: 'Standard', detail: '1 boutique' },
-                { id: 'multishop', label: 'Multi-boutiques', detail: 'jusqu’à 5' },
-              ].map(plan => {
-                const selected = selectedPlan === plan.id;
-                return (
-                  <button
-                    key={plan.id}
-                    type="button"
-                    onClick={() => setSelectedPlan(plan.id)}
-                    style={{
-                      border: selected ? `1px solid ${BRAND}` : '1px solid transparent',
-                      background: selected ? 'var(--bg-surface)' : 'transparent',
-                      color: selected ? BRAND : 'var(--text-secondary)',
-                      borderRadius: '8px',
-                      padding: '9px 8px',
-                      cursor: 'pointer',
-                      boxShadow: selected ? '0 2px 8px rgba(14, 107, 168, 0.1)' : 'none',
-                    }}
-                  >
-                    <span style={{ display: 'block', fontSize: '12px', fontWeight: 800 }}>{plan.label}</span>
-                    <span style={{ display: 'block', fontSize: '10px', marginTop: '2px', opacity: 0.78 }}>{plan.detail}</span>
-                  </button>
-                );
-              })}
             </div>
 
             {error && !(
-              (registerStep === 1 && (!shopName.trim() || !adminName.trim()))
-              || (registerStep === 2 && (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8))
+              (registerStep === 1 && (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email)))
+              || (registerStep === 2 && (!shopName.trim() || password.length < 8))
             ) && (
               <div style={{
                 display: 'flex',
@@ -1089,25 +1073,22 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
               </div>
             )}
 
-            <StepProgress step={registerStep} total={2} />
+            <StepProgress step={registerStep} total={2} items={[{ label: 'Vous', icon: User }, { label: 'Boutique', icon: Store }]} />
             <form onSubmit={handleRegister} noValidate>
               <FormStep stepKey={registerStep}>
                 {registerStep === 1 ? <>
-                  <FormField id="register-shop" label="Nom de la boutique" error={error && !shopName.trim() ? 'Indiquez le nom de votre boutique.' : null}>
-                    <FormInput id="register-shop" leadingIcon={<Store size={18} />} type="text" autoComplete="organization" placeholder="Ex. Électronique Fatima" value={shopName} onChange={(e) => { setShopName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !shopName.trim())} autoFocus />
-                  </FormField>
                   <FormField id="register-name" label="Votre nom" error={error && !adminName.trim() ? 'Indiquez votre nom.' : null}>
-                    <FormInput id="register-name" leadingIcon={<User size={18} />} type="text" autoComplete="name" placeholder="Ex. Fatima" value={adminName} onChange={(e) => { setAdminName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !adminName.trim())} />
+                    <FormInput id="register-name" leadingIcon={<User size={18} />} type="text" autoComplete="name" placeholder="Votre nom" value={adminName} onChange={(e) => { setAdminName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !adminName.trim())} autoFocus />
+                  </FormField>
+                  <FormField id="register-email" label="Email" error={error && !/^\S+@\S+\.\S+$/.test(email) ? 'Adresse email invalide.' : null}>
+                    <FormInput id="register-email" leadingIcon={<Mail size={18} />} type="email" inputMode="email" autoComplete="email" placeholder="Votre email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} aria-invalid={Boolean(error && !/^\S+@\S+\.\S+$/.test(email))} />
                   </FormField>
                   <div className="form-actions"><button type="button" className="btn btn-primary" onClick={goToCredentials}>Continuer <ArrowRight size={17} /></button></div>
                 </> : <>
-                  <FormField id="register-email" label="Adresse email" error={error && !/^\S+@\S+\.\S+$/.test(email) ? 'Saisissez une adresse email valide.' : null}>
-                    <FormInput id="register-email" leadingIcon={<Mail size={18} />} type="email" inputMode="email" autoComplete="email" placeholder="admin@maboutique.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} aria-invalid={Boolean(error && !/^\S+@\S+\.\S+$/.test(email))} autoFocus />
+                  <FormField id="register-shop" label="Nom de la boutique" error={error && !shopName.trim() ? 'Indiquez le nom de votre boutique.' : null}>
+                    <FormInput id="register-shop" leadingIcon={<Store size={18} />} type="text" autoComplete="organization" placeholder="Nom de la boutique" value={shopName} onChange={(e) => { setShopName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !shopName.trim())} autoFocus />
                   </FormField>
-                  <FormField id="register-phone" label={<>Numéro de téléphone <span className="ui-optional">facultatif</span></>} help="Vous pourrez aussi utiliser ce numéro pour vous connecter.">
-                    <FormInput id="register-phone" leadingIcon={<Smartphone size={18} />} type="tel" inputMode="tel" autoComplete="tel" placeholder="Ex. +221 77 000 00 00" value={phone} onChange={(e) => { setPhone(e.target.value); setError(''); }} />
-                  </FormField>
-                  <FormField id="register-password" label="Mot de passe" error={error && password.length < 8 ? 'Utilisez au moins 8 caractères.' : null} help="Il protège aussi les données enregistrées sur cet appareil.">
+                  <FormField id="register-password" label="Mot de passe" error={error && password.length < 8 ? '8 caractères minimum.' : null}>
                     <FormInput id="register-password" leadingIcon={<LockKeyhole size={18} />} type="password" autoComplete="new-password" placeholder="8 caractères minimum" value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} aria-invalid={Boolean(error && password.length < 8)} />
                   </FormField>
                   <div className="form-actions"><button type="button" className="btn btn-secondary" onClick={() => { setError(''); setRegisterStep(1); }}>Retour</button><LoadingButton type="submit" loading={loading} className="btn btn-primary">Créer ma boutique</LoadingButton></div>
@@ -1116,7 +1097,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
             </form>
 
             <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-              Vous avez déjà un compte ?{' '}
+              Déjà inscrit ?{' '}
               <button
                 onClick={() => {
                   setShowRegisterModal(false);

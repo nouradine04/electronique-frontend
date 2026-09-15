@@ -12,6 +12,7 @@ export interface PullChangesResponse {
   has_more: boolean;
   next_cursor: string | null;
   limit: number;
+  initial_history_days: number;
 }
 
 export interface PushChangesResponse {
@@ -20,4 +21,5 @@ export interface PushChangesResponse {
   has_more: boolean;
   next_cursor: string | null;
   timestamp?: number;
+  rejected_ids?: Record<string, string[]>;
 }

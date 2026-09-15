@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Check, LoaderCircle, Plus, Search, Smartphone, Trash2, Upload, X, Package, Wallet, ClipboardCheck, Pencil } from 'lucide-react';
+import { Camera, LoaderCircle, Plus, Search, Smartphone, Trash2, Upload, X, Package, Wallet, ClipboardCheck, Pencil } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
 import { LocalImage } from '../common/LocalImage.jsx';
-import { saveLocalImage } from '../../services/localMedia.js';
+import { cacheCatalogImage, saveLocalImage } from '../../services/localMedia.js';
 import { searchPhoneCatalog } from '../../services/phoneCatalog.js';
 import { FormStep, LoadingButton, StepProgress } from '../forms/FormUI';
 import { AmountInput } from '../forms/AmountInput';
@@ -150,6 +150,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
       colors: splitCatalogOptions(phone.colors),
     };
     setCatalogOptions(options);
+    const catalogImage = phone.imageUrl || phone.image_url || '';
     setFormData(previous => ({
       ...previous,
       name: [brand, model].filter(Boolean).join(' '),
@@ -167,12 +168,13 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
       screen: phone.screen || '',
       operating_system: phone.os || '',
       release_date: phone.releaseDate || '',
-      image_url: phone.imageUrl || phone.image_url || previous.image_url,
+      image_url: catalogImage || previous.image_url,
       specs_json: JSON.stringify(phone),
     }));
     setCatalogQuery([brand, model].filter(Boolean).join(' '));
     setCatalogResults([]);
     setCatalogStatus('selected');
+    if (catalogImage) void cacheCatalogImage(catalogImage).catch(() => undefined);
   };
 
   const useManualEntry = () => {
@@ -288,6 +290,8 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   );
 
   const colorOptions = Array.from(new Set([formData.color, ...catalogOptions.colors, ...DEFAULT_PHONE_COLORS].filter(Boolean)));
+  const hasCatalogSelection = Boolean(formData.catalog_id) && catalogStatus !== 'manual';
+  const showManualFields = catalogStatus === 'manual' || Boolean(initialData && !formData.catalog_id);
 
   const updateCustomSpec = (index, key, value) => {
     setCustomSpecs(previous => previous.map((field, position) => position === index ? { ...field, [key]: value } : field));
@@ -308,9 +312,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               {initialData ? 'Modifier le produit' : 'Ajouter un produit'}
             </h3>
-            <div style={{ marginTop: '3px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {catalogOnly ? 'Modifiez les informations du catalogue.' : 'Recherchez le modèle, puis choisissez sa variante exacte.'}
-            </div>
+            {catalogOnly && <div style={{ marginTop: '3px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Informations du produit</div>}
           </div>
           <button type="button" onClick={onClose} aria-label="Fermer" style={{ width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'var(--bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}>
             <X size={18} />
@@ -318,21 +320,19 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
         </div>
 
         <form className="wizard-form" onSubmit={handleSubmit} noValidate style={{ overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <StepProgress step={step} total={totalSteps} items={catalogOnly ? [{ label: 'Produit', icon: Package }, { label: 'Vérification', icon: ClipboardCheck }] : [{ label: 'Produit', icon: Package }, { label: 'Stock & prix', icon: Wallet }]} onSelect={saving ? undefined : page => { setFormError(''); setStep(page); }} />
+          <StepProgress step={step} total={totalSteps} items={catalogOnly ? [{ label: 'Produit', icon: Package }, { label: 'Vérifier', icon: ClipboardCheck }] : [{ label: 'Produit', icon: Package }, { label: 'Stock', icon: Wallet }]} onSelect={saving ? undefined : page => { setFormError(''); setStep(page); }} />
           {formError && <div className="wizard-error" role="alert">{formError}</div>}
           {step === 1 && <FormStep stepKey={step}>
-          <div className="wizard-step-heading"><strong>Identifier le produit</strong><span>Recherchez un modèle ou saisissez son nom.</span></div>
-          <details className="wizard-catalog-search">
-            <summary><Search size={16} /> Rechercher un téléphone dans le catalogue</summary>
-          <section style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '12px', background: 'var(--bg-main)' }}>
-            <label style={labelStyle}>Rechercher dans le catalogue de téléphones</label>
+          <section className="catalog-picker">
+            {!hasCatalogSelection && <>
+            <label style={labelStyle}>Rechercher un téléphone</label>
             <div style={{ position: 'relative' }}>
               <Search size={17} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type="search"
                 value={catalogQuery}
                 onChange={event => setCatalogQuery(event.target.value)}
-                placeholder="Ex : Samsung S24, iPhone 15, Tecno Spark…"
+                placeholder="Marque ou modèle"
                 style={{ ...inputStyle, paddingLeft: '40px', background: 'var(--bg-surface)' }}
                 autoFocus={!initialData}
               />
@@ -363,11 +363,6 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
               </div>
             )}
 
-            {catalogStatus === 'selected' && (
-              <div style={{ marginTop: '9px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--success)', fontSize: '0.8rem', fontWeight: 600 }}>
-                <Check size={15} /> {formData.image_url ? 'Modèle et image chargés.' : 'Modèle trouvé sans image. Prenez une photo ou choisissez-en une.'} Vérifiez la capacité, la couleur et le type de SIM.
-              </div>
-            )}
             {['empty', 'offline'].includes(catalogStatus) && (
               <div style={{ marginTop: '9px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 {catalogStatus === 'offline' ? 'Catalogue indisponible hors connexion. ' : 'Aucun modèle trouvé. '}
@@ -376,12 +371,19 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
                 </button>
               </div>
             )}
-          </section>
-          </details>
+            {catalogStatus === 'idle' && <button type="button" className="catalog-manual-link" onClick={useManualEntry}>Saisir un autre produit</button>}
+            </>}
 
-          <div>
+            {hasCatalogSelection && <div className="catalog-selected-product">
+              <span className="catalog-selected-image">{formData.image_url ? <LocalImage src={formData.image_url} alt="" /> : <Smartphone size={24} />}</span>
+              <span><strong>{formData.name}</strong><small>{formData.image_url ? 'Image chargée' : 'Photo facultative'}</small></span>
+              <button type="button" onClick={() => { setCatalogStatus('idle'); setCatalogQuery(''); }}>Changer</button>
+            </div>}
+          </section>
+
+          {showManualFields && <div className="manual-product-fields"><div>
             <label htmlFor="product-name" style={labelStyle}>Nom du produit *</label>
-            <input id="product-name" type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ex : Apple iPhone 15 Pro 256 GB" style={inputStyle} required />
+            <input id="product-name" type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Nom du produit" style={inputStyle} required />
           </div>
 
           <div className="wizard-field-grid" style={responsiveGrid}>
@@ -392,9 +394,10 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
               </select>
             </div>
           </div>
+          </div>}
           </FormStep>}
 
-          {step === 1 && <section>
+          {step === 1 && needsVariant && (hasCatalogSelection || showManualFields) && <section>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
               <Smartphone size={18} color="var(--accent-primary)" />
               <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Caractéristiques de l’appareil</strong>
@@ -459,7 +462,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
               {formData.image_url && <button type="button" onClick={() => setFormData(previous => ({ ...previous, image_url: null }))} style={{ padding: '7px 8px', fontSize: '0.8rem', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Supprimer</button>}
             </div>
             {imageError && <div style={{ marginTop: '7px', color: 'var(--danger)', fontSize: '0.75rem', fontWeight: 600 }}>{imageError}</div>}
-            {formData.image_url && formData.catalog_id && <div style={{ marginTop: '7px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>La miniature du catalogue sera enregistrée avec le produit et restera disponible hors ligne.</div>}
+            {formData.image_url && formData.catalog_id && <div style={{ marginTop: '7px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Image du catalogue disponible hors connexion après son chargement.</div>}
           </div>
           <details className="wizard-optional"><summary>Ajouter une description</summary><textarea name="description" value={formData.description} onChange={handleChange} placeholder="État, garantie ou détail utile…" style={{ ...inputStyle, minHeight: '72px', resize: 'vertical', marginTop: '10px' }} /></details>
           </div></details>}

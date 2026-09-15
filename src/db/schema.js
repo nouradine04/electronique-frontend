@@ -19,6 +19,15 @@ export const localUserAccountColumns = [
 export const localUserPhoneColumns = [
   { name: 'phone', type: 'string', isIndexed: true, isOptional: true },
 ];
+export const localUserSyncColumns = [
+  { name: 'synced', type: 'boolean' },
+];
+
+// Version connue du serveur. Elle permet de raisonner sur les conflits sans
+// faire confiance à l'horloge du téléphone.
+export const syncVersionColumns = [
+  { name: 'version', type: 'number', isOptional: true },
+];
 
 export const shopSubscriptionColumns = [
   { name: 'subscription_plan', type: 'string', isOptional: true },
@@ -74,6 +83,7 @@ export const returnSchema = {
     { name: 'refund_amount', type: 'number' },
     { name: 'processed_by', type: 'string', isOptional: true },
     { name: 'date', type: 'string' },
+    ...syncVersionColumns,
     { name: 'synced', type: 'boolean' },
   ],
 };
@@ -89,17 +99,18 @@ export const expenseSchema = {
     { name: 'recurrence', type: 'string', isOptional: true },
     { name: 'employee_name', type: 'string', isOptional: true },
     { name: 'created_by', type: 'string', isOptional: true },
+    ...syncVersionColumns,
     { name: 'synced', type: 'boolean' },
   ],
 };
 
 export const localUserSchema = {
   ...localUserV3Schema,
-  columns: [...localUserV3Schema.columns, ...localUserAccountColumns, ...localUserPhoneColumns],
+  columns: [...localUserV3Schema.columns, ...localUserAccountColumns, ...localUserPhoneColumns, ...localUserSyncColumns, ...syncVersionColumns],
 };
 
 export default appSchema({
-  version: 8,
+  version: 10,
   tables: [
     tableSchema(localUserSchema),
     tableSchema({
@@ -114,6 +125,7 @@ export default appSchema({
         { name: 'code', type: 'string', isOptional: true },
         { name: 'subscription_plan', type: 'string', isOptional: true },
         { name: 'account_id', type: 'string', isIndexed: true, isOptional: true },
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     }),
@@ -122,6 +134,7 @@ export default appSchema({
       columns: [
         { name: 'shop_id', type: 'string', isIndexed: true },
         { name: 'name', type: 'string' },
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     }),
@@ -140,6 +153,7 @@ export default appSchema({
         { name: 'image_url', type: 'string', isOptional: true },
         { name: 'location', type: 'string', isOptional: true },
         ...productCatalogColumns,
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     }),
@@ -156,6 +170,7 @@ export default appSchema({
         { name: 'seller_name', type: 'string', isOptional: true },
         { name: 'seller_role', type: 'string', isOptional: true },
         ...saleAccountingColumns,
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     }),
@@ -168,6 +183,7 @@ export default appSchema({
         { name: 'client_id', type: 'string', isIndexed: true },
         { name: 'amount', type: 'number' },
         { name: 'date', type: 'string' },
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     }),
@@ -178,6 +194,7 @@ export default appSchema({
         { name: 'name', type: 'string' },
         { name: 'phone', type: 'string', isOptional: true },
         { name: 'email', type: 'string', isOptional: true },
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     }),
@@ -192,6 +209,7 @@ export default appSchema({
         { name: 'user_name', type: 'string', isOptional: true },
         { name: 'date', type: 'string' },
         ...stockMovementDeliveryColumns,
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     }),
@@ -206,6 +224,7 @@ export default appSchema({
         { name: 'date_emission', type: 'string' },
         { name: 'date_echeance', type: 'string', isOptional: true },
         { name: 'items_json', type: 'string', isOptional: true },
+        ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]
     })

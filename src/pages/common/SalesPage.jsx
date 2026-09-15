@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePagination } from '../../components/ui/usePagination.js';
 import { useQuery } from '../../db/useQuery.js';
-import { queryProducts, queryCategories, querySales, queryClients, queryPayments, queryStockMovements, queryInvoices, database, createSale } from '../../db/queries.js';
+import { queryProducts, querySales, createSale } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
-import { Search, Eye, Edit2, Trash2, Filter } from 'lucide-react';
+import { Search, Eye, Edit2, Filter } from 'lucide-react';
 import { LocalImage } from '../../components/common/LocalImage.jsx';
 
 export function SalesPage() {
@@ -73,17 +73,6 @@ export function SalesPage() {
 
     return matchesSearch && matchesDate;
   });
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Voulez-vous vraiment supprimer cette vente ?')) {
-      const targetSale = sales.find(s => s.id === id);
-      if (targetSale) {
-        await database.write(async () => {
-          await targetSale.destroyPermanently();
-        });
-      }
-    }
-  };
 
   const salePage = usePagination(filteredSales, `${currentShop?.id}:${searchQuery}:${dateFilter}:${statusFilter}`);
   return (
@@ -195,9 +184,6 @@ export function SalesPage() {
                           </button>
                           <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f59e0b', padding: '4px' }} title="Modifier">
                             <Edit2 size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(sale.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }} title="Supprimer">
-                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>

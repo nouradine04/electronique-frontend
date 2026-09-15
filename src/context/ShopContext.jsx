@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useQuery } from '../db/useQuery.js';
-import { seedDefaultShopIfEmpty, queryAllShops, createShop, database } from '../db/queries.js';
+import { queryAllShops, createShop, database } from '../db/queries.js';
 import { getPlanLimits, removeLegacyDemoUsers } from '../services/localAuth.js';
 
 const ShopContext = createContext();
@@ -10,6 +10,7 @@ export function ShopProvider({ children }) {
   const [userRole, setUserRole] = useState(() => (localStorage.getItem('userRole') || 'manager').toLowerCase());
   const [userName, setUserName] = useState(() => localStorage.getItem('userName') || 'Utilisateur');
   const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem('currentUserId') || '');
+  const [hasValidLocalSession, setHasValidLocalSession] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Requête réactive sur toutes les boutiques (mise à jour automatique)
@@ -20,15 +21,31 @@ export function ShopProvider({ children }) {
 
   useEffect(() => {
     async function init() {
-      // Crée la boutique par défaut si la DB est vide
-      const shop = await seedDefaultShopIfEmpty();
       await removeLegacyDemoUsers();
-      // Restaure la boutique sélectionnée
+      const storedShops = await queryAllShops().fetch();
       const storedShopId = localStorage.getItem('currentShopId');
+      const storedUserId = localStorage.getItem('currentUserId');
+      let localUser = null;
+      if (storedUserId) {
+        try { localUser = await database.get('local_users').find(storedUserId); }
+        catch { localUser = null; }
+      }
+      const userShop = localUser ? storedShops.find(shop => shop.id === localUser.shopId) : null;
+      const allowedShops = userShop
+        ? storedShops.filter(shop => shop.accountId === userShop.accountId)
+        : [];
+      const selectedShop = allowedShops.find(shop => shop.id === storedShopId) || userShop || null;
+      const validSession = Boolean(localUser?.isActive && selectedShop);
+      setCurrentShop(selectedShop);
+      setHasValidLocalSession(validSession);
+      if (validSession) localStorage.setItem('currentShopId', selectedShop.id);
+      else {
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('currentUserId');
+        localStorage.removeItem('currentShopId');
+      }
       setIsInitialized(true);
-
-      // On attend que availableShops soit chargé (géré en dessous)
-      return storedShopId;
     }
     init();
   }, []);
@@ -89,6 +106,7 @@ export function ShopProvider({ children }) {
     const displayName = name || (role === 'owner' ? 'Administrateur' : 'Gestionnaire');
     setUserRole(role);
     setUserName(displayName);
+    setHasValidLocalSession(true);
     localStorage.setItem('userRole', role);
     localStorage.setItem('userName', displayName);
     if (userId) { setCurrentUserId(userId); localStorage.setItem('currentUserId', userId); }
@@ -100,10 +118,12 @@ export function ShopProvider({ children }) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('access_token');
     localStorage.removeItem('currentUserId');
+    localStorage.removeItem('currentShopId');
     sessionStorage.removeItem('encryption_pin');
     setUserRole('manager');
     setUserName('Utilisateur');
     setCurrentUserId('');
+    setHasValidLocalSession(false);
   };
 
   return (
@@ -113,6 +133,7 @@ export function ShopProvider({ children }) {
       userRole,
       userName,
       currentUserId,
+      hasValidLocalSession,
       isInitialized,
       switchRole,
       switchShop,

@@ -11,4 +11,6 @@ export default class LocalUser extends Model {
   get passwordSalt() { return this._getRaw('password_salt'); }
   get isActive() { return this._getRaw('is_active') !== false; }
   get createdAt() { return this._getRaw('account_created_at') || ''; }
+  get synced() { return this._getRaw('synced'); }
+  set synced(value) { this._setRaw('synced', value); }
 }

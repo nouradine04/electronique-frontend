@@ -40,6 +40,18 @@ export async function saveLocalImage(file, options = {}) {
   return compressImage(file, options.maxDimension, options.quality);
 }
 
+/** Conserve une image publique du catalogue pour son affichage hors connexion. */
+export async function cacheCatalogImage(url) {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || typeof caches === 'undefined') return false;
+  const cache = await caches.open('nstock-product-images');
+  const request = new Request(url, { mode: 'no-cors' });
+  if (await cache.match(request)) return true;
+  const response = await fetch(request);
+  if (!response.ok && response.type !== 'opaque') return false;
+  await cache.put(request, response.clone());
+  return true;
+}
+
 export const isLocalMediaReference = () => false;
 
 export async function resolveLocalImage(value) {

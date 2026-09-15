@@ -86,7 +86,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, s
           {userRole === 'owner' ? (
             <div style={{ position: 'relative' }}>
               <select
-                value={currentShop.id}
+                value={currentShop?.id || ''}
                 onChange={(e) => switchShop(e.target.value)}
                 className="input-field"
                 style={{
@@ -106,7 +106,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, s
             </div>
           ) : (
             <div style={{ minHeight: '40px', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-main)', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {currentShop.name}
+              {currentShop?.name || 'Boutique'}
             </div>
           )}
         </div>

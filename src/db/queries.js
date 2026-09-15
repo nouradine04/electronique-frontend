@@ -4,7 +4,8 @@
  * Offline-first: toutes les opérations sont locales.
  * synced = false signale qu'il faut synchroniser avec le backend NestJS.
  */
-import { Q } from '@nozbe/watermelondb';
+import { Q, columnName } from '@nozbe/watermelondb';
+import { markLocalChangesAsSynced } from '@nozbe/watermelondb/sync/impl';
 import database from './watermelondb';
 export { database };
 
@@ -19,6 +20,27 @@ export const stockMovements = database.get('stock_movements');
 export const invoices = database.get('invoices');
 export const returns = database.get('returns');
 export const expenses = database.get('expenses');
+export const localUsers = database.get('local_users');
+
+const syncCollections = [
+  { table: 'shops', key: 'shops', collection: shops, shopColumn: 'id' },
+  { table: 'users', localTable: 'local_users', key: 'users', collection: localUsers, shopColumn: 'shop_id', ownerOnly: true },
+  { table: 'categories', key: 'categories', collection: categories, shopColumn: 'shop_id' },
+  { table: 'products', key: 'products', collection: products, shopColumn: 'shop_id' },
+  { table: 'clients', key: 'clients', collection: clients, shopColumn: 'shop_id' },
+  { table: 'sales', key: 'sales', collection: sales, shopColumn: 'shop_id' },
+  { table: 'payments', key: 'payments', collection: payments, shopColumn: 'shop_id' },
+  { table: 'stock_movements', key: 'stockMovements', collection: stockMovements, shopColumn: 'shop_id' },
+  { table: 'returns', key: 'returns', collection: returns, shopColumn: 'shop_id' },
+  { table: 'expenses', key: 'expenses', collection: expenses, shopColumn: 'shop_id' },
+  { table: 'invoices', key: 'invoices', collection: invoices, shopColumn: 'shop_id' },
+];
+
+const statusColumn = columnName('_status');
+
+function syncScope(config, shopId) {
+  return shopId ? [Q.where(config.shopColumn, shopId)] : [];
+}
 
 // ─── SHOPS ────────────────────────────────────────────────────────────────────
 export const queryAllShops = () => shops.query();
@@ -417,56 +439,83 @@ const seedDefaultShop = async () => {
   return defaultShop;
 };
 
-export const getUnsyncedRecords = async () => {
-  const [
-    unsyncedSales,
-    unsyncedProducts,
-    unsyncedClients,
-    unsyncedPayments,
-    unsyncedMovements,
-    unsyncedInvoices,
-    unsyncedShops,
-    unsyncedReturns,
-    unsyncedExpenses,
-  ] = await Promise.all([
-    sales.query(Q.where('synced', false)).fetch(),
-    products.query(Q.where('synced', false)).fetch(),
-    clients.query(Q.where('synced', false)).fetch(),
-    payments.query(Q.where('synced', false)).fetch(),
-    stockMovements.query(Q.where('synced', false)).fetch(),
-    invoices.query(Q.where('synced', false)).fetch(),
-    shops.query(Q.where('synced', false)).fetch(),
-    returns.query(Q.where('synced', false)).fetch(),
-    expenses.query(Q.where('synced', false)).fetch(),
-  ]);
+/**
+ * Lit au maximum un lot de changements WatermelonDB. `_status` constitue déjà
+ * la file d'attente durable native : created, updated puis synced après accusé
+ * de réception. On évite ainsi de charger toutes les écritures hors ligne.
+ */
+export const getUnsyncedRecords = async (shopId, includeUsers = true, limit = 500) => {
+  const safeLimit = Math.min(Math.max(Number(limit) || 500, 1), 500);
+  let remaining = safeLimit;
+  const result = { total: 0, changeStates: {}, syncSnapshot: { changes: {}, affectedRecords: [] } };
 
-  return {
-    sales: unsyncedSales,
-    products: unsyncedProducts,
-    clients: unsyncedClients,
-    payments: unsyncedPayments,
-    stockMovements: unsyncedMovements,
-    invoices: unsyncedInvoices,
-    shops: unsyncedShops,
-    returns: unsyncedReturns,
-    expenses: unsyncedExpenses,
-    total:
-      unsyncedSales.length +
-      unsyncedProducts.length +
-      unsyncedClients.length +
-      unsyncedPayments.length +
-      unsyncedMovements.length +
-      unsyncedInvoices.length +
-      unsyncedShops.length +
-      unsyncedReturns.length +
-      unsyncedExpenses.length,
-  };
+  for (const config of syncCollections) {
+    const snapshotTable = config.localTable || config.table;
+    const empty = { created: [], updated: [], deleted: [] };
+    result[config.key] = [];
+    result.changeStates[config.key] = empty;
+    result.syncSnapshot.changes[snapshotTable] = { created: [], updated: [], deleted: [] };
+
+    if (remaining === 0 || (config.ownerOnly && !includeUsers)) continue;
+    const scope = syncScope(config, shopId);
+    const created = await config.collection.query(
+      Q.where(statusColumn, 'created'),
+      ...scope,
+      Q.take(remaining),
+    ).fetch();
+    remaining -= created.length;
+
+    const updated = remaining > 0
+      ? await config.collection.query(
+          Q.where(statusColumn, 'updated'),
+          ...scope,
+          Q.take(remaining),
+        ).fetch()
+      : [];
+    remaining -= updated.length;
+
+    // Les lignes supprimées ne sont plus interrogeables comme des modèles,
+    // mais l'adaptateur conserve leurs identifiants jusqu'à l'accusé serveur.
+    const deleted = remaining > 0
+      ? (await database.adapter.getDeletedRecords(snapshotTable)).slice(0, remaining)
+      : [];
+    remaining -= deleted.length;
+
+    const records = [...created, ...updated];
+    result[config.key] = records;
+    result.changeStates[config.key] = { created, updated, deleted };
+    result.syncSnapshot.changes[snapshotTable] = {
+      created: created.map(record => ({ ...record._raw })),
+      updated: updated.map(record => ({ ...record._raw })),
+      deleted,
+    };
+    result.syncSnapshot.affectedRecords.push(...records);
+    result.total += records.length + deleted.length;
+  }
+
+  return result;
 };
 
-export const markAsSynced = async (records) => {
-  await database.write(async () => {
-    for (const record of records) {
-      await record.update(r => { r.synced = true; });
-    }
-  });
+export const getUnsyncedCount = async (shopId, includeUsers = true) => {
+  const counts = await Promise.all(syncCollections.map(async config => {
+    if (config.ownerOnly && !includeUsers) return 0;
+    const scope = syncScope(config, shopId);
+    const snapshotTable = config.localTable || config.table;
+    const [created, updated, deleted] = await Promise.all([
+      config.collection.query(Q.where(statusColumn, 'created'), ...scope).fetchCount(),
+      config.collection.query(Q.where(statusColumn, 'updated'), ...scope).fetchCount(),
+      database.adapter.getDeletedRecords(snapshotTable),
+    ]);
+    return created + updated + deleted.length;
+  }));
+  return counts.reduce((total, count) => total + count, 0);
+};
+
+export const markAsSynced = async (batch, rejectedIds = {}) => {
+  if (!batch?.syncSnapshot || batch.total === 0) return;
+  const localRejectedIds = {
+    ...rejectedIds,
+    local_users: rejectedIds.users || [],
+  };
+  await markLocalChangesAsSynced(database, batch.syncSnapshot, localRejectedIds);
 };

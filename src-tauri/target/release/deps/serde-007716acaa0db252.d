@@ -1,0 +1,14 @@
+/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/deps/serde-007716acaa0db252.d: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/serde-740b1682234bed8d/out/private.rs
+
+/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/deps/libserde-007716acaa0db252.rlib: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/serde-740b1682234bed8d/out/private.rs
+
+/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/deps/libserde-007716acaa0db252.rmeta: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/serde-740b1682234bed8d/out/private.rs
+
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/serde-740b1682234bed8d/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/serde-740b1682234bed8d/out

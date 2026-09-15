@@ -27,14 +27,18 @@ import { TransactionsPage } from './pages/admin/TransactionsPage.jsx';
 import { CrmPage } from './pages/admin/CrmPage.jsx';
 import { TeamPage } from './pages/admin/TeamPage.jsx';
 import { ensurePersistentStorage } from './services/persistentStorage.js';
+import { closeDesktopVault, isTauriDesktop } from './services/desktopVault';
+import { stopDesktopBackup } from './services/desktopBackup';
 
 function MainAppContent() {
-  const { currentShop, userRole, isInitialized, logout } = useShop();
+  const { currentShop, userRole, isInitialized, hasValidLocalSession, logout } = useShop();
   const { records: products, loading: productsLoading } = useQueryState(queryProducts(currentShop?.id || ''));
   const { records: sales, loading: salesLoading } = useQueryState(querySales(currentShop?.id || ''));
   const { records: categories, loading: categoriesLoading } = useQueryState(queryCategories(currentShop?.id || ''));
   const { records: movements, loading: movementsLoading } = useQueryState(queryStockMovements(currentShop?.id || ''));
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('userRole'));
+  // Le coffre SQLCipher exige une ouverture explicite après chaque redémarrage
+  // de l'application desktop. La version web conserve son comportement actuel.
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !isTauriDesktop() && !!localStorage.getItem('userRole'));
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'dashboard'
   const [showAddModal, setShowAddModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -47,29 +51,45 @@ function MainAppContent() {
     }
   }, [isAuthenticated, userRole]);
 
-  // Protège autant que possible la base WatermelonDB contre l'éviction
-  // automatique du navigateur. L'opération reste silencieuse pour l'utilisateur.
+  // Une préférence de session sans boutique locale ne constitue pas une
+  // authentification valide. Ce cas peut arriver après un nettoyage navigateur.
   React.useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isInitialized || !isAuthenticated || (hasValidLocalSession && currentShop)) return;
+    logout();
+    setIsAuthenticated(false);
+    setCurrentPage('login');
+  }, [isInitialized, isAuthenticated, hasValidLocalSession, currentShop, logout]);
+
+  // Demande la persistance dès l'ouverture, avant une éventuelle inscription.
+  // Les comptes et les premières données bénéficient ainsi de la protection
+  // maximale proposée par le navigateur dès leur création.
+  React.useEffect(() => {
     ensurePersistentStorage().then(result => {
       if (!result.persisted) {
         console.warn('[Stockage local] Persistance non garantie par ce navigateur.');
       }
     });
-  }, [isAuthenticated]);
+  }, []);
 
   const handleLoginSuccess = (role) => {
+    // Nouvelle tentative silencieuse après l'action de l'utilisateur : Safari
+    // peut alors accorder la persistance selon ses propres heuristiques.
+    void ensurePersistentStorage();
     setIsAuthenticated(true);
     setActiveTab(role === 'manager' ? 'dashboard' : 'dashboard');
   };
 
   const handleLogout = () => {
+    if (isTauriDesktop()) {
+      stopDesktopBackup();
+      void closeDesktopVault();
+    }
     logout();
     setCurrentPage('login');
     setIsAuthenticated(false);
   };
 
-  if (!isInitialized || (isAuthenticated && (productsLoading || salesLoading || categoriesLoading || movementsLoading))) {
+  if (!isInitialized || (isAuthenticated && (!hasValidLocalSession || !currentShop || productsLoading || salesLoading || categoriesLoading || movementsLoading))) {
     return (
       <LoadingScreen />
     );

@@ -1,9 +1,10 @@
 let persistenceRequest;
 
 /**
- * Demande au navigateur de ne pas évincer automatiquement les données locales.
- * Le navigateur reste libre d'accepter ou de refuser. La synchronisation cloud
- * demeure donc la protection définitive contre la perte d'un appareil.
+ * Tente silencieusement d'empêcher l'éviction automatique des données locales.
+ * Safari et les navigateurs Chromium décident eux-mêmes, sans formulaire dans
+ * l'application. Un refus n'est pas mémorisé afin de réessayer après connexion
+ * ou lors du prochain lancement de l'application installée.
  */
 export function ensurePersistentStorage() {
   if (!persistenceRequest) {
@@ -22,7 +23,12 @@ export function ensurePersistentStorage() {
         usage: estimate?.usage ?? null,
         quota: estimate?.quota ?? null,
       };
-    })().catch(() => ({ supported: true, persisted: false }));
+    })()
+      .catch(() => ({ supported: true, persisted: false }))
+      .then(result => {
+        if (!result.persisted) persistenceRequest = undefined;
+        return result;
+      });
   }
 
   return persistenceRequest;

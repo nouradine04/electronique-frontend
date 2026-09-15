@@ -22,14 +22,30 @@ import StockMovement from './models/StockMovement';
 import Invoice from './models/Invoice';
 import ReturnRecord from './models/ReturnRecord';
 import Expense from './models/Expense';
+import { installLocalIdGenerator } from './localId';
+
+installLocalIdGenerator();
 
 const LokiJSAdapter = RawLokiJSAdapter.default || RawLokiJSAdapter;
+const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+class VolatileLokiAdapter {
+  constructor() { this.store = new Map(); }
+  loadDatabase(name, callback) { callback(this.store.get(name) || null); }
+  saveDatabase(name, value, callback) { this.store.set(name, value); callback(); }
+  deleteDatabase(name, callback) { this.store.delete(name); callback?.(); }
+}
+
+const memoryAdapter = isTauriRuntime ? new VolatileLokiAdapter() : undefined;
 
 const adapter = new LokiJSAdapter({
   schema,
   migrations,
   useWebWorker: false,
   useIncrementalIndexedDB: true,
+  // Dans Tauri, SQLCipher est l'unique stockage durable. Loki reste en mémoire
+  // comme modèle réactif pour l'interface et est restauré depuis le coffre.
+  ...(memoryAdapter ? { _testLokiAdapter: memoryAdapter } : {}),
   dbName: 'nstock_v2',
   onQuotaExceededError: (error) => {
     console.error('Storage quota exceeded:', error);
@@ -55,6 +71,36 @@ export const database = new Database({
     Expense,
   ],
 });
+
+/** Force l'écriture IndexedDB après une opération critique comme l'inscription. */
+let saveQueue = Promise.resolve();
+
+export function flushLocalDatabase() {
+  const save = () => new Promise((resolve, reject) => {
+    database.adapter.unsafeExecute({
+      loki: loki => {
+        loki.saveDatabase(error => error ? reject(error) : resolve());
+      },
+    }).catch(reject);
+  });
+  saveQueue = saveQueue.catch(() => undefined).then(save);
+  return saveQueue;
+}
+
+// L'autosave Loki est conservé, mais chaque mutation déclenche aussi une
+// sauvegarde sérialisée immédiate. Une fermeture juste après une vente ou une
+// inscription ne doit pas attendre l'intervalle d'autosave.
+if (!isTauriRuntime) {
+  const durableTables = [
+    'local_users', 'shops', 'categories', 'products', 'sales', 'returns',
+    'expenses', 'payments', 'clients', 'stock_movements', 'invoices',
+  ];
+  database.experimentalSubscribe(durableTables, () => {
+    void flushLocalDatabase().catch(error => {
+      console.error('[Stockage local] Écriture immédiate impossible.', error);
+    });
+  });
+}
 
 // L'adaptateur IndexedDB incrémental charge les collections à la demande. Après
 // une migration de schéma, son premier autosave peut sinon tenter de relire un

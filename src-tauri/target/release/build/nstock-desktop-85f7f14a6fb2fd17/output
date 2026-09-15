@@ -1,0 +1,13 @@
+cargo:rerun-if-env-changed=TAURI_CONFIG
+cargo:rustc-check-cfg=cfg(desktop)
+cargo:rustc-cfg=desktop
+cargo:rustc-check-cfg=cfg(mobile)
+cargo:rerun-if-changed=/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/tauri.conf.json
+cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_APP_NAME=desktop
+cargo:rustc-env=TAURI_ANDROID_PACKAGE_NAME_PREFIX=com_nstock
+cargo:rustc-check-cfg=cfg(dev)
+cargo:PERMISSION_FILES_PATH=/Users/mac/Desktop/fatima/electronique/frontend/src-tauri/target/release/build/nstock-desktop-85f7f14a6fb2fd17/out/app-manifest/__app__-permission-files
+cargo:rerun-if-changed=capabilities
+cargo:rerun-if-env-changed=REMOVE_UNUSED_COMMANDS
+cargo:rustc-env=TAURI_ENV_TARGET_TRIPLE=aarch64-apple-darwin
+cargo:rustc-env=MACOSX_DEPLOYMENT_TARGET=10.13
