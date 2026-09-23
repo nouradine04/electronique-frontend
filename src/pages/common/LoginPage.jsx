@@ -54,7 +54,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
     } catch (err) {
       if (err instanceof NetworkError) setConnectionError(true);
       if (isTauriDesktop()) void closeDesktopVault();
-      setError(err.message || 'Erreur lors de la connexion');
+      setError(`${err.message || 'Erreur lors de la connexion'} (Serveur: ${import.meta.env.VITE_BACKEND_URL || 'local'})`);
       setLoading(false);
     }
   };

@@ -87,8 +87,13 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       setLoading(false);
       return;
     }
-    if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.');
+    if (!adminName.trim()) {
+      setError('Indiquez votre nom complet.');
+      setLoading(false);
+      return;
+    }
+    if (password.trim().length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caractères (sans espaces).');
       setLoading(false);
       return;
     }
