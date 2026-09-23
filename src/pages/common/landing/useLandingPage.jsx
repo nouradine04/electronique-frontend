@@ -80,7 +80,15 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
   const handleRegister = async (e) => {
     e.preventDefault();
     if (registerStep === 1) { goToCredentials(); return; }
-    if (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
+    
+    // Forcer la lecture depuis les inputs HTML si le state React est vide (contourne le bug d'autofill sur mobile)
+    const elements = e.target.elements;
+    const finalAdminName = adminName || (elements['register-name'] ? elements['register-name'].value : '');
+    const finalEmail = email || (elements['register-email'] ? elements['register-email'].value : '');
+    const finalShopName = shopName || (elements['register-shop'] ? elements['register-shop'].value : '');
+    const finalPassword = password || (elements['register-password'] ? elements['register-password'].value : '');
+
+    if (!finalAdminName.trim() || !/^\S+@\S+\.\S+$/.test(finalEmail.trim())) {
       setRegisterStep(1);
       setError('Vérifiez votre nom et votre email.');
       return;
@@ -88,17 +96,17 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
     setLoading(true);
     setError('');
 
-    if (!shopName.trim()) {
+    if (!finalShopName.trim()) {
       setError('Indiquez le nom de votre boutique.');
       setLoading(false);
       return;
     }
-    if (!adminName.trim()) {
+    if (!finalAdminName.trim()) {
       setError('Indiquez votre nom complet.');
       setLoading(false);
       return;
     }
-    if (password.length < 8) {
+    if (finalPassword.trim().length < 8) {
       setError('Le mot de passe doit contenir au moins 8 caractères.');
       setLoading(false);
       return;
@@ -108,11 +116,11 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       if (!navigator.onLine) throw new NetworkError('Connexion Internet requise pour créer votre compte.');
 
       if (isTauriDesktop()) {
-        await openDesktopVault(email, password);
+        await openDesktopVault(finalEmail, finalPassword);
       }
 
-      const session = await registerCloudAccount({ shop_name: shopName, name: adminName, email, password });
-      const newUser = await restoreLocalOwnerFromCloud(session, password);
+      const session = await registerCloudAccount({ shop_name: finalShopName, name: finalAdminName, email: finalEmail, password: finalPassword });
+      const newUser = await restoreLocalOwnerFromCloud(session, finalPassword);
       const newShop = { id: session.shop.id };
 
       setBackupPassword(password);
