@@ -80,7 +80,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
     finally { setLoading(false); }
   };
 
-  if (connectionError) return <AppErrorPage kind="connection" onBack={() => setConnectionError(false)} onRetry={() => { void handleSubmit({ preventDefault() {} }); }} />;
+  if (connectionError) return <AppErrorPage kind="connection" detail={error} onBack={() => setConnectionError(false)} onRetry={() => { void handleSubmit({ preventDefault() {} }); }} />;
 
   if (loading) return <LoadingScreen label="Connexion à votre boutique…" />;
 

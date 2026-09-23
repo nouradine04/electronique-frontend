@@ -62,7 +62,7 @@ export async function sessionRequest(endpoint: string, payload: Record<string, u
   }).catch(() => { throw new NetworkError(); });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (response.status >= 500) throw new NetworkError();
+    if (response.status >= 500) throw new NetworkError(data.reference ? `Serveur temporairement indisponible. Référence : ${data.reference}` : undefined);
     if (response.status === 401 && endpoint !== '/auth/logout') blockSession();
     throw new ApiError(response.status, data.message || `Erreur serveur ${response.status}`, data);
   }
