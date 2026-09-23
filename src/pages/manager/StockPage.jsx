@@ -63,7 +63,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
     if (statusFilter === 'LOW') matchesStatus = product.status !== 'PENDING_PRICE' && product.quantity <= product.min_stock && product.quantity > 0;
     if (statusFilter === 'OUT') matchesStatus = product.status !== 'PENDING_PRICE' && product.quantity === 0;
 
-    return matchesSearch && matchesCategory && matchesStatus;
+    return unitMatches.has(product.id) || (matchesSearch && matchesCategory && matchesStatus);
   }).sort((a, b) => {
     let valA = a[sortField];
     let valB = b[sortField];
@@ -140,7 +140,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
   const totalUnits = products.reduce((sum, product) => sum + Number(product.quantity || 0), 0);
 
   if (selectedProductId) {
-    return <ProductDetailPage productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
+    return <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
   }
 
   return (
@@ -170,7 +170,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
             <input
               type="text"
               className="input-field"
-              placeholder="Nom, référence ou emplacement…"
+              placeholder="Produit, IMEI ou numéro de série…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />

@@ -1,3 +1,4 @@
+import './product-form.css';
 import { IdentifierPhotoReader } from './IdentifierPhotoReader';
 import { parseIdentifiers } from '../../services/productUnits';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -52,10 +53,10 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   const { userRole, userName } = useShop();
   const isOwner = userRole === 'owner';
   const phoneCategory = findPhoneCategory(categories);
-  const initialCategoryId = readInitial(initialData, 'category_id', 'categoryId') || categories[0]?.id || '';
+  const initialCategoryId = readInitial(initialData, 'category_id', 'categoryId') || '';
   const [formData, setFormData] = useState({
     id: initialData?.id,
-    tracking_mode: initialData?.trackingMode || 'QUANTITY',
+    tracking_mode: readInitial(initialData, 'tracking_mode', 'trackingMode') || 'QUANTITY',
     identifiers: '',
     name: initialData?.name || '',
     category_id: initialCategoryId,
@@ -110,6 +111,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
 
   useEffect(() => {
     const query = catalogQuery.trim();
+    if (!catalogExpanded) return undefined;
     if (query.length < 2) {
       setCatalogResults([]);
       setCatalogStatus('idle');
@@ -121,6 +123,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
       setCatalogStatus('loading');
       try {
         const results = await searchPhoneCatalog(query, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         setCatalogResults(results);
         setCatalogStatus(results.length ? 'ready' : 'empty');
       } catch (error) {
@@ -135,7 +138,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [catalogQuery]);
+  }, [catalogQuery, catalogExpanded]);
 
   const handleChange = (event) => {
     const { name, value, type } = event.target;
@@ -179,6 +182,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
       specs_json: JSON.stringify(phone),
     }));
     setCatalogQuery([brand, model].filter(Boolean).join(' '));
+    setCatalogExpanded(false);
     setCatalogResults([]);
     setCatalogStatus('selected');
     if (catalogImage) void cacheCatalogImage(catalogImage).catch(() => undefined);
@@ -186,6 +190,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
 
   const useManualEntry = () => {
     setCatalogExpanded(false);
+    setCatalogQuery('');
     setCatalogResults([]);
     setCatalogStatus('manual');
     setCatalogOptions({ ram: [], storage: [], colors: [] });
@@ -209,20 +214,34 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   const needsVariant = /t[ée]l[ée]phone|smartphone|phone|tablette/i.test(selectedCategory?.name || '');
 
   useEffect(() => {
-    if (!initialData && /t[ée]l[ée]phone|smartphone/i.test(selectedCategory?.name || '') && formData.tracking_mode === 'QUANTITY') setFormData(previous => ({ ...previous, tracking_mode: 'IMEI' }));
+    if (!initialData && /t[ée]l[ée]phone|smartphone|phone/i.test(selectedCategory?.name || '') && formData.tracking_mode === 'QUANTITY') setFormData(previous => ({ ...previous, tracking_mode: 'IMEI' }));
   }, [selectedCategory?.name, initialData, formData.tracking_mode]);
 
+  const tracksInitialUnits = !initialData && formData.tracking_mode !== 'QUANTITY';
+  const initialQuantity = tracksInitialUnits ? String(formData.identifiers).split(/[\n,;]+/).filter(value => value.trim()).length : formData.quantity;
+
   const validateStep = current => {
-    if (current === 1 && (!formData.name.trim() || !formData.category_id)) return 'Indiquez le nom et la catégorie du produit.';
+    if (current === 1 && !formData.name.trim()) return 'Indiquez le nom du produit.';
+    if (current === 1 && !selectedCategory) return 'Choisissez une catégorie pour le produit.';
     if (current === 1 && needsVariant && (!formData.storage_capacity || !formData.color)) return 'Choisissez la capacité et la couleur.';
-    if (!catalogOnly && current === 2 && (formData.quantity === '' || !Number.isInteger(Number(formData.quantity)) || Number(formData.quantity) < 0 || formData.min_stock === '' || !Number.isInteger(Number(formData.min_stock)) || Number(formData.min_stock) < 1)) return 'Indiquez une quantité entière positive ou nulle et un seuil d’au moins 1.';
+    if (!catalogOnly && current === 2 && (initialQuantity === '' || !Number.isInteger(Number(initialQuantity)) || Number(initialQuantity) < 0 || formData.min_stock === '' || !Number.isInteger(Number(formData.min_stock)) || Number(formData.min_stock) < 1)) return 'Indiquez une quantité entière positive ou nulle et un seuil d’au moins 1.';
+    if (!catalogOnly && current === 2 && tracksInitialUnits) {
+      try { parseIdentifiers(formData.identifiers, formData.tracking_mode); } catch (error) { return error.message; }
+    }
     if (!catalogOnly && current === 2 && isOwner && ([formData.unit_cost, formData.price].some(value => value === '' || !Number.isFinite(Number(value)) || Number(value) < 0))) return 'Indiquez le coût d’achat et le prix de vente. Vous pouvez saisir 0 si nécessaire.';
     return '';
   };
 
   const nextStep = () => {
     const message = validateStep(step);
-    if (message) { setFormError(message); return; }
+    if (message) {
+      setFormError(message);
+      if (step === 1) {
+        const field = !formData.name.trim() ? 'name' : !selectedCategory ? 'category_id' : !formData.storage_capacity ? 'storage_capacity' : 'color';
+        fileInputRef.current?.form?.elements.namedItem(field)?.focus();
+      }
+      return;
+    }
     setFormError('');
     setStep(current => Math.min(totalSteps, current + 1));
   };
@@ -248,7 +267,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     }
     const finalData = {
       ...formData,
-      quantity: Number(formData.quantity),
+      quantity: Number(initialQuantity),
       min_stock: Number(formData.min_stock),
       unit_cost: Number(formData.unit_cost),
       price: Number(formData.price),
@@ -304,7 +323,6 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
 
   const colorOptions = Array.from(new Set([formData.color, ...catalogOptions.colors, ...DEFAULT_PHONE_COLORS].filter(Boolean)));
   const hasCatalogSelection = Boolean(formData.catalog_id) && catalogStatus !== 'manual';
-  const showManualFields = catalogStatus === 'manual' || Boolean(initialData && !formData.catalog_id);
 
   const updateCustomSpec = (index, key, value) => {
     setCustomSpecs(previous => previous.map((field, position) => position === index ? { ...field, [key]: value } : field));
@@ -334,24 +352,14 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
 
         <form className="wizard-form" onSubmit={handleSubmit} noValidate style={{ overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <StepProgress step={step} total={totalSteps} items={catalogOnly ? [{ label: 'Produit', icon: Package }, { label: 'Vérifier', icon: ClipboardCheck }] : [{ label: 'Produit', icon: Package }, { label: 'Stock', icon: Wallet }]} onSelect={saving ? undefined : page => { setFormError(''); setStep(page); }} />
-          {formError && <div className="wizard-error" role="alert">{formError}</div>}
+          {formError && <div id="product-form-error" className="wizard-error" role="alert">{formError}</div>}
           {step === 1 && <FormStep stepKey={step}>
-          {showManualFields && !catalogExpanded ? <button type="button" className="catalog-manual-link" onClick={() => setCatalogExpanded(true)}><Search size={15} /> Rechercher dans le catalogue</button> : <section className="catalog-picker">
-            {!hasCatalogSelection && <>
-            <label style={labelStyle}>Rechercher un téléphone</label>
-            <div style={{ position: 'relative' }}>
-              <Search size={17} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="search"
-                value={catalogQuery}
-                onChange={event => setCatalogQuery(event.target.value)}
-                placeholder="Marque ou modèle"
-                style={{ ...inputStyle, paddingLeft: '40px', background: 'var(--bg-surface)' }}
-                autoFocus={!initialData}
-              />
-              {catalogStatus === 'loading' && <LoaderCircle size={17} className="spin" style={{ position: 'absolute', right: '13px', top: '50%', transform: 'translateY(-50%)', color: 'var(--accent-primary)' }} />}
-            </div>
-
+          <div className="manual-product-fields"><div>
+            <label htmlFor="product-name" style={labelStyle}>Nom du produit <span className="required-mark">*</span></label>
+            <input id="product-name" type="text" name="name" value={formData.name} onChange={event => { handleChange(event); setCatalogQuery(event.target.value); setCatalogExpanded(true); setFormData(previous => ({ ...previous, catalog_id: '', catalog_source: 'manual' })); }} placeholder="Ex : iPhone 17 Pro, chargeur…" style={inputStyle} required aria-invalid={Boolean(formError && !formData.name.trim())} aria-describedby={formError && !formData.name.trim() ? 'product-form-error' : undefined} />
+            <small style={{ color: 'var(--text-muted)' }}>Saisissez le nom ou choisissez un modèle proposé.</small>
+            {catalogExpanded && catalogQuery.trim().length >= 2 && <section className="catalog-picker" aria-label="Modèles de téléphones proposés">
+              {catalogStatus === 'loading' && <small role="status"><LoaderCircle size={14} className="spin" /> Recherche de modèles…</small>}
             {catalogResults.length > 0 && (
               <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
                 {catalogResults.map(phone => (
@@ -378,39 +386,33 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
 
             {['empty', 'offline'].includes(catalogStatus) && (
               <div style={{ marginTop: '9px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                {catalogStatus === 'offline' ? 'Catalogue indisponible hors connexion. ' : 'Aucun modèle trouvé. '}
+                {catalogStatus === 'offline' ? 'Suggestions indisponibles. Vous pouvez garder votre saisie. ' : 'Aucun modèle trouvé. '}
                 <button type="button" onClick={useManualEntry} style={{ padding: 0, border: 0, background: 'transparent', color: 'var(--accent-primary)', fontWeight: 700, cursor: 'pointer' }}>
                   Saisir manuellement
                 </button>
               </div>
             )}
-            {catalogStatus === 'idle' && <button type="button" className="catalog-manual-link" onClick={useManualEntry}>Saisir un autre produit</button>}
-            </>}
+            {catalogStatus === 'ready' && <button type="button" className="catalog-manual-link" onClick={useManualEntry}>Saisir manuellement</button>}
 
-            {hasCatalogSelection && <div className="catalog-selected-product">
-              <span className="catalog-selected-image">{formData.image_url ? <LocalImage src={formData.image_url} alt="" /> : <Smartphone size={24} />}</span>
-              <span><strong>{formData.name}</strong><small>{formData.image_url ? 'Image chargée' : 'Photo facultative'}</small></span>
-              <button type="button" onClick={() => { setCatalogStatus('idle'); setCatalogQuery(''); }}>Changer</button>
-            </div>}
-          </section>}
 
-          {showManualFields && <div className="manual-product-fields"><div>
-            <label htmlFor="product-name" style={labelStyle}>Nom du produit *</label>
-            <input id="product-name" type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Nom du produit" style={inputStyle} required />
+            </section>}
+            {hasCatalogSelection && <small style={{ color: 'var(--accent-primary)' }}>Modèle sélectionné · vérifiez la capacité et la couleur ci-dessous.</small>}
           </div>
 
           <div className="wizard-field-grid" style={responsiveGrid}>
             <div>
-              <label htmlFor="product-category" style={labelStyle}>Catégorie *</label>
-              <select id="product-category" name="category_id" value={formData.category_id} onChange={handleChange} style={inputStyle} required>
+              <label htmlFor="product-category" style={labelStyle}>Catégorie <span className="required-mark">*</span></label>
+              <select id="product-category" name="category_id" value={selectedCategory ? formData.category_id : ''} onChange={handleChange} style={inputStyle} required aria-invalid={Boolean(formError && !selectedCategory)} aria-describedby={formError && !selectedCategory ? 'product-form-error' : undefined}>
+                <option value="">Choisir une catégorie</option>
                 {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
+              {categories.length === 0 && <small>Aucune catégorie disponible. Ajoutez une catégorie depuis le stock avant de créer le produit.</small>}
             </div>
           </div>
-          </div>}
+          </div>
           </FormStep>}
 
-          {step === 1 && needsVariant && (hasCatalogSelection || showManualFields) && <section>
+          {step === 1 && needsVariant && <section>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
               <Smartphone size={18} color="var(--accent-primary)" />
               <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Quelle variante ?</strong>
@@ -487,10 +489,10 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
             </label>
             {!initialData && formData.tracking_mode !== 'QUANTITY' && <><IdentifierPhotoReader mode={formData.tracking_mode} value={formData.identifiers} onChange={identifiers => setFormData(previous => ({ ...previous, identifiers }))} /><label style={labelStyle}>{formData.tracking_mode === 'IMEI' ? 'IMEI principal' : 'Numéro de série'} · un par ligne *
               <textarea name="identifiers" value={formData.identifiers} onChange={handleChange} rows={3} style={{ ...inputStyle, height: 'auto', resize: 'vertical' }} placeholder="Un identifiant par appareil" />
-              <small>Les identifiants sont vérifiés avant l’enregistrement.</small>
+              <small>Un appareil = un identifiant unique, même modèle et même couleur. La quantité se calcule automatiquement.</small>
             </label></>}
             <div className="wizard-field-grid" style={responsiveGrid}>
-              <div><label htmlFor="product-quantity" style={labelStyle}>Quantité initiale *</label><input id="product-quantity" disabled={!!initialData && formData.tracking_mode !== 'QUANTITY'} type="number" name="quantity" min="0" value={formData.quantity} onChange={handleChange} style={inputStyle} required /></div>
+              <div><label htmlFor="product-quantity" style={labelStyle}>Quantité initiale *</label><input id="product-quantity" readOnly={tracksInitialUnits} disabled={!!initialData && formData.tracking_mode !== 'QUANTITY'} type="number" name="quantity" min="0" value={initialQuantity} onChange={handleChange} style={inputStyle} required /></div>
               <details className="wizard-optional"><summary>Alerte de stock · {formData.min_stock || 5} articles</summary><label htmlFor="product-min-stock" style={labelStyle}>Me prévenir en dessous de</label><input id="product-min-stock" type="number" name="min_stock" min="1" value={formData.min_stock} onChange={handleChange} style={inputStyle} /></details>
             </div>
 

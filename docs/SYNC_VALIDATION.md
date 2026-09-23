@@ -94,3 +94,33 @@ Restent : tests métier et appareils, extraction photo/caméra, conversion des s
 Le Dockerfile frontend copie maintenant `scripts/`, nécessaire à la génération des assets OCR au build. Inclure `scripts/ocr-assets.mjs`, les dépendances et le lockfile dans le push ; les fichiers OCR publics sont générés à partir des paquets verrouillés, pas à télécharger manuellement.
 
 Déployer le backend et ses migrations avant le frontend. Configurer `VITE_BACKEND_URL` au build avec l'URL réelle de l'API ; autoriser l'origine frontend via `CORS_ORIGINS` côté backend au runtime. Aucun push ni déploiement de production exécuté par cette vérification. Les tests IMEI PostgreSQL embarqués ne remplacent pas un essai de concurrence multi-connexion ou un essai PWA hors ligne sur iPhone réel.
+
+## Recherche et réception d'appareils — 23 septembre 2026
+
+La recherche de modèles est intégrée au nom du produit (suggestions après 300 ms, annulation de la requête précédente). Le nom et la catégorie restent toujours visibles. Une nouvelle fiche ne choisit plus arbitrairement la première catégorie. La réception IMEI/série calcule sa quantité depuis les identifiants ; leur validité et unicité restent contrôlées avant écriture.
+
+Stock administrateur, stock gestionnaire et catalogue annoncent la recherche par IMEI/série. Un résultat par identifiant peut être retrouvé même si un filtre de stock/catégorie l'aurait masqué. La fiche ouvre les appareils, reprend le filtre et développe l'historique si un seul appareil correspond. Les IMEI avec espaces/tirets de présentation sont normalisés. La caisse peut rechercher un modèle par IMEI disponible ; elle exige toujours la sélection explicite de l'unité au paiement.
+
+`npm run test:products` : rendu des champs obligatoires et réception de deux appareils identiques avec IMEI distincts dans WatermelonDB en mémoire ; recherche d'un IMEI vendu, refus de sa nouvelle sélection et d'une réception doublonnée. Les anciennes fiches sans identifiants ne sont pas converties artificiellement.
+
+## Authentification sur un nouvel appareil — 23 septembre 2026
+
+- L’authentification distante ne dépend plus de `VITE_ENABLE_CLOUD_SYNC` : ce réglage concerne uniquement la synchronisation métier. Le mode hors ligne reste soumis à une session antérieure valide.
+- Le champ identifiant désactive la correction et les majuscules automatiques sur mobile.
+- `.env.production` utilise `https://nstockbackend.medaaris.com`, adresse observée dans le bundle public. Avec Docker, vérifier également le build argument `VITE_BACKEND_URL` : il prévaut sur ce fichier. Une ancienne surcharge locale `backend_url` peut encore orienter un appareil vers une autre API ; ne pas la modifier sans vérifier la provenance des données.
+- `npm run test:auth` dans frontend couvre la connexion distante sans session locale, le refus serveur, le mode hors ligne et les sessions. Dans backend, cette commande vérifie l’inscription, la conservation du mot de passe serveur après une synchronisation de profil et une nouvelle connexion, ainsi que les cookies et la rotation des sessions. Le test de persistance utilise PGlite avec les migrations du projet ; il ne teste pas le compte de production.
+- Vérification publique : le preflight OPTIONS de `/auth/login` autorise `https://nstock.medaaris.com`. Cela ne prouve pas que le compte concerné existe dans cette base. Le diagnostic du compte nécessite encore son email, les adresses utilisées sur les deux appareils et la date de création par rapport à la remise à zéro de PostgreSQL. Ne pas effacer les données locales en attente.
+
+### Inscription strictement distante
+
+Suppression des anciennes fonctions inutilisées d’inscription locale et de migration automatique d’un propriétaire. Le formulaire refuse explicitement une inscription hors ligne. Le service exige une réponse serveur cohérente (utilisateur et boutique liés) avant d’accepter la session. La copie WatermelonDB intervient ensuite, avec les identifiants serveur ; l’inscription ne passe pas par la file de synchronisation.
+
+`npm run test:auth` couvre également le formulaire : attente du serveur sans écriture locale ni navigation, refus serveur, inscription hors ligne. Le compte de production signalé est absent de la base interrogée par l’utilisateur. Ces changements ne récupèrent pas ce compte ni ses ventes locales : vérifier l’API utilisée par l’appareil d’origine avant toute récupération ; ne pas supprimer son stockage ni créer arbitrairement de nouveaux identifiants.
+
+### Nouvelle connexion obligatoirement en ligne
+
+Le formulaire de connexion ne vérifie plus les mots de passe dans WatermelonDB en secours. Même avec une ancienne session valide, une soumission du formulaire exige une réponse du serveur ; sans réseau ou en cas d’erreur réseau, aucune navigation vers l’espace connecté. La restauration des données desktop intervient après validation serveur. Suppression de `loginLocalUser`.
+
+Une session web déjà ouverte peut être reprise avec son utilisateur local et sa référence de session serveur correspondant à la même API. L’expiration du token d’accès de 15 minutes ne bloque pas le travail hors ligne ; l’échéance hors ligne bloque les écritures sans supprimer les données. La déconnexion supprime la référence de session. Tauri conserve l’ouverture explicite du coffre au redémarrage : cette modification ne fournit pas de déverrouillage automatique du coffre hors ligne.
+
+Tests `test:auth` : 14 scénarios réussis, dont formulaire hors ligne, serveur injoignable sans repli local, connexion réussie, maintien d’une session existante, lecture seule à expiration et déconnexion.

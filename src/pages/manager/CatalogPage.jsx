@@ -86,7 +86,7 @@ export function CatalogManagementPage() {
       if (statusFilter === 'IN_STOCK') statusMatch = product.quantity > 0 && product.status !== 'PENDING_PRICE';
       if (statusFilter === 'OUT_OF_STOCK') statusMatch = product.quantity === 0 && product.status !== 'PENDING_PRICE';
       if (statusFilter === 'PENDING') statusMatch = product.status === 'PENDING_PRICE';
-      return nameMatch && catMatch && statusMatch;
+      return unitMatches.has(product.id) || (nameMatch && catMatch && statusMatch);
     });
   }, [products, searchQuery, selectedCategory, statusFilter, unitMatches]);
   const pageSize = 10;
@@ -134,7 +134,7 @@ export function CatalogManagementPage() {
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              placeholder="Rechercher..."
+              placeholder="Produit, IMEI ou numéro de série…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ width: '100%', padding: '10px 10px 10px 40px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', outline: 'none' }}
@@ -254,7 +254,7 @@ export function CatalogManagementPage() {
         />
       )}
 
-      {selectedProductId && <ProductDetailPage productId={selectedProductId} onBack={() => setSelectedProductId(null)} onEdit={product => { setSelectedProductId(null); setEditingProduct(product); }} />}
+      {selectedProductId && <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} onEdit={product => { setSelectedProductId(null); setEditingProduct(product); }} />}
 
       {editingProduct && <AddProductWizard initialData={editingProduct} categories={categories} catalogOnly={userRole === 'manager'} onClose={() => setEditingProduct(null)} onSubmit={handleSaveProduct} />}
 

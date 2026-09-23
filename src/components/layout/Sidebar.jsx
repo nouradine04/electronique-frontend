@@ -17,7 +17,8 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-import logoImg from '../../assets/logo.png';
+import { BrandLogo } from '../BrandLogo';
+import './navigation.css';
 
 export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, setIsMobileMenuOpen }) {
   const { t } = useTranslation();
@@ -74,10 +75,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, s
         {/* Brand Header */}
         <div style={{ padding: '24px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <img src={logoImg} alt="Logo" style={{ width: '44px', height: '44px', objectFit: 'contain', borderRadius: '8px', flexShrink: 0 }} />
-            <div className="sidebar-text" style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-              NStock
-            </div>
+            <BrandLogo className={isCollapsed ? 'sidebar-brand-small' : 'sidebar-brand'} />
           </div>
         </div>
 
@@ -177,6 +175,7 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, s
         {/* Logout Button (styled as NavItem for perfect alignment) */}
         <button
           onClick={onLogout}
+          className="sidebar-logout"
           style={{
             display: 'flex',
             alignItems: 'center',

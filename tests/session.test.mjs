@@ -50,3 +50,19 @@ test('session: explicit server refusal locks local writes; no local fallback', a
   assert.throws(() => s.api.assertSessionWritable(), /Reconnexion/);
   assert.ok(s.storage.has('nstock_session'), 'metadata kept to explain lock without deleting business data');
 });
+
+test('existing session resumes offline; access expiry does not close it; logout removes it', async () => {
+  const s=setup();
+  assert.equal(s.api.hasStoredSessionFor('u1'),false);
+  await s.api.acceptSession({access_token:s.token(-10),offline_access_until:s.expiry,user_id:'u1'});
+  s.context.navigator.onLine=false;
+  assert.equal(s.api.hasStoredSessionFor('u1'),true);
+  assert.equal(s.api.hasStoredSessionFor('another-user'),false);
+  assert.equal(s.api.canWorkOffline(),true);
+  assert.equal(s.requests(),0);
+  s.storage.set('nstock_session',JSON.stringify({userId:'u1',api:'https://api.medaaris.com',offlineAccessUntil:new Date(0).toISOString()}));
+  assert.equal(s.api.hasStoredSessionFor('u1'),true,'expired session remains available for read-only access');
+  assert.equal(s.api.canWorkOffline(),false);
+  await assert.rejects(s.api.logoutSession());
+  assert.equal(s.api.hasStoredSessionFor('u1'),false);
+});

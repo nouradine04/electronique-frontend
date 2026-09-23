@@ -3,6 +3,11 @@ import { createLocalId } from '../db/localId';
 
 export type TrackingMode = 'QUANTITY' | 'IMEI' | 'SERIAL';
 export const unitRaw = (record: Model): Record<string, any> => record._raw;
+export function normalizeIdentifierSearch(value: string): string {
+  const text = String(value || '').trim().toUpperCase();
+  return /^[\d\s-]+$/.test(text) ? text.replace(/[\s-]/g, '') : text;
+}
+
 export function parseIdentifiers(text: string, mode: TrackingMode): string[] {
   const values = String(text || '').split(/[\n,;]+/).map(value => value.trim().toUpperCase()).filter(Boolean);
   if (values.length > 100) throw new Error('Recevez au maximum 100 appareils à la fois.');

@@ -1,3 +1,4 @@
+import { FcGoogle } from 'react-icons/fc';
 import React, { useEffect, useRef } from 'react';
 import { BACKEND_URL } from '../../context/backendConfig.js';
 
@@ -49,6 +50,6 @@ export function GoogleSignInButton({ onVerified, onError }: { onVerified: (profi
     return () => { cancelled = true; };
   }, [clientId]);
 
-  if (!clientId) return <button type="button" className="google-unconfigured" onClick={() => onError('La connexion Google nécessite encore la clé VITE_GOOGLE_CLIENT_ID.')}>Continuer avec Google</button>;
+  if (!clientId) return <button type="button" className="google-unconfigured" onClick={() => onError('La connexion Google nécessite encore la clé VITE_GOOGLE_CLIENT_ID.')}><FcGoogle size={20} aria-hidden="true" /><span>Continuer avec Google</span></button>;
   return <div ref={container} className="google-signin" aria-label="Connexion avec Google" />;
 }

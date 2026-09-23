@@ -1,6 +1,5 @@
 import { Q } from '@nozbe/watermelondb';
 import database, { flushLocalDatabase } from '../db/watermelondb.js';
-import { isTauriDesktop, upsertDesktopRecord } from './desktopVault';
 import { prepareLocalUser } from './prepareLocalUser.js';
 
 const users = database.get('local_users');
@@ -43,77 +42,6 @@ async function credentials(password) {
 
 function prepareUser(data) {
   return prepareLocalUser(users, data);
-}
-
-async function persistDesktopRegistration(shop, user, categories) {
-  if (!isTauriDesktop()) return;
-  const tenantId = shop.accountId || shop.id;
-  const now = new Date().toISOString();
-  const records = [
-    { collection: 'shops', record: shop, shopId: shop.id },
-    { collection: 'local_users', record: user, shopId: shop.id },
-    ...categories.map(record => ({ collection: 'categories', record, shopId: shop.id })),
-  ];
-  await Promise.all(records.map(({ collection, record, shopId }) => upsertDesktopRecord({
-    collection,
-    id: record.id,
-    tenantId,
-    shopId,
-    payload: { ...record._raw },
-    updatedAt: now,
-    deletedAt: null,
-    syncStatus: 'pending',
-  })));
-}
-
-export async function loginLocalUser(identifier, password) {
-  const value = String(identifier || '').trim();
-  const field = value.includes('@') ? 'email' : 'phone';
-  const normalized = field === 'email' ? normalizeEmail(value) : normalizePhone(value);
-  const matches = await users.query(Q.where(field, field === 'email' ? Q.oneOf(emailCandidates(normalized)) : normalized)).fetch();
-  for (const user of matches) {
-    if (user.isActive && await passwordHash(password, user.passwordSalt) === user.passwordHash) return user;
-  }
-  throw new Error('Identifiant ou mot de passe incorrect');
-}
-
-export async function loginLocalGoogleUser(email) {
-  const user = (await users.query(Q.where('email', Q.oneOf(emailCandidates(email)))).fetch()).find(account => account.isActive);
-  if (!user || !user.isActive) throw new Error('Aucun compte actif ne correspond à cette adresse Google. Créez d’abord votre boutique ou demandez à votre administrateur de vous ajouter.');
-  return user;
-}
-
-export async function registerLocalShop({ name, code, email, phone, password, adminName, subscriptionPlan = 'standard' }) {
-  email = normalizeEmail(email);
-  phone = normalizePhone(phone);
-  if (!name.trim() || !adminName.trim() || !email || !password) throw new Error('Veuillez remplir tous les champs');
-  const plan = getPlanLimits(subscriptionPlan);
-  const hashed = await credentials(password);
-  const registration = await database.write(async () => {
-    if (await users.query(Q.where('email', Q.oneOf(emailCandidates(email)))).fetchCount()) throw new Error('Cet email est déjà utilisé sur cet appareil.');
-    if (phone && await users.query(Q.where('phone', phone)).fetchCount()) throw new Error('Ce numéro est déjà utilisé sur cet appareil.');
-    const shop = database.get('shops').prepareCreate(s => {
-      s.name = name.trim(); s.code = code; s.email = email; s.phone = phone; s.subscriptionPlan = plan.id; s.accountId = s.id; s.synced = false;
-    });
-    const user = prepareUser({
-      shop_id: shop.id,
-      name: adminName.trim(),
-      email,
-      phone,
-      role: 'owner',
-      is_active: true,
-      account_created_at: new Date().toISOString(),
-      ...hashed,
-    });
-    const categories = ['Téléphones', 'Accessoires', 'Tablettes', 'Informatique', 'Audio', 'Autres'].map(name =>
-      database.get('categories').prepareCreate(c => { c.shopId = shop.id; c.name = name; c.synced = false; })
-    );
-    await database.batch(shop, user, ...categories);
-    await persistDesktopRegistration(shop, user, categories);
-    return { shop, user };
-  });
-  await flushLocalDatabase();
-  return registration;
 }
 
 export async function restoreLocalOwnerFromCloud(session, password) {

@@ -1,4 +1,3 @@
-import { LOCAL_ONLY } from '../context/backendConfig';
 import { acceptSession, finishPendingLogout, NetworkError, sessionRequest } from './session';
 
 export type CloudSession = {
@@ -15,26 +14,17 @@ async function saveSession(session: CloudSession) {
 }
 
 export async function loginCloudAccount(email: string, password: string) {
-  if (LOCAL_ONLY || !navigator.onLine) throw new NetworkError();
+  if (!navigator.onLine) throw new NetworkError();
   await finishPendingLogout();
   return saveSession(await sessionRequest('/auth/login', { email: email.trim().toLowerCase(), password }));
 }
 
-export async function ensureCloudOwnerAccount(shop: any, user: any, password: string) {
-  if (LOCAL_ONLY || !navigator.onLine) throw new NetworkError();
-  await finishPendingLogout();
-  return saveSession(await sessionRequest('/auth/register', {
-      tenant_id: shop.accountId || shop.id,
-      shop_id: shop.id,
-      user_id: user.id,
-      shop_name: shop.name,
-      name: user.name,
-      email: user.email,
-      password,
-  }));
-}
-
 export async function registerCloudAccount(input: { shop_name: string; name: string; email: string; password: string }) {
+  if (!navigator.onLine) throw new NetworkError('Connexion Internet requise pour créer votre compte.');
   await finishPendingLogout();
-  return saveSession(await sessionRequest('/auth/register', input));
+  const session = await sessionRequest('/auth/register', { ...input, email: input.email.trim().toLowerCase() });
+  if (!session?.user?.id || !session?.shop?.id || session.user_id !== session.user.id || session.user.shop_id !== session.shop.id) {
+    throw new Error('Le serveur n’a pas confirmé la création de votre compte et de votre boutique.');
+  }
+  return saveSession(session);
 }

@@ -1,0 +1,14 @@
+.wizard-card .required-mark { color: var(--danger); }
+.wizard-card .manual-product-fields { display: grid; gap: 20px; }
+.wizard-card label { line-height: 1.5; }
+.wizard-card input, .wizard-card select, .wizard-card textarea { scroll-margin-block: 80px; }
+.wizard-card input:focus-visible, .wizard-card select:focus-visible, .wizard-card textarea:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.wizard-card button { touch-action: manipulation; }
+.wizard-card .wizard-header > button { min-width: 44px; min-height: 44px; }
+@media(max-width:600px) {
+ .wizard-overlay .wizard-card { height: auto !important; max-height: calc(100dvh - max(12px, env(safe-area-inset-top))) !important; border-radius: 20px 20px 0 0 !important; }
+ .wizard-card .wizard-form { overscroll-behavior: contain; }
+ .wizard-card input, .wizard-card select { min-height: 48px; font-size: 16px !important; }
+ .wizard-card small { display: block; line-height: 1.5; margin-top: 6px; }
+ .wizard-card .wizard-footer > button { min-width: 0; flex: 1; }
+}

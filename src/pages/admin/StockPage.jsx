@@ -38,7 +38,7 @@ export function AdminStockPage() {
     const catStr = String(categories.find(category => category.id === p.categoryId)?.name || '').toLowerCase();
     const matchesSearch = unitMatches.has(p.id) || nameStr.includes(q) || catStr.includes(q);
     const matchesCategory = selectedCategory === 'ALL' || p.categoryId === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return unitMatches.has(p.id) || (matchesSearch && matchesCategory);
   });
   const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
@@ -57,7 +57,7 @@ export function AdminStockPage() {
   };
 
   if (selectedProductId) {
-    return <ProductDetailPage productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
+    return <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
   }
 
   return (
@@ -77,7 +77,7 @@ export function AdminStockPage() {
           <input
             type="text"
             className="input-field"
-            placeholder={t('admin.stock_search_placeholder', 'Rechercher un produit, une catégorie...')}
+            placeholder="Produit, IMEI ou numéro de série…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />

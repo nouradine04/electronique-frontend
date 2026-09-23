@@ -3,7 +3,7 @@ import { BACKEND_URL } from '../context/backendConfig';
 export type SessionState = { userId: string; offlineAccessUntil: string; api: string; blocked?: boolean };
 type SessionResponse = { access_token: string; offline_access_until: string; user_id: string; refresh_token?: string };
 export class SessionError extends Error { constructor(message = 'Session expirée. Reconnexion requise.') { super(message); } }
-export class NetworkError extends Error { constructor() { super('Serveur injoignable. Vérifiez votre connexion ou réessayez plus tard.'); } }
+export class NetworkError extends Error { constructor(message = 'Serveur injoignable. Vérifiez votre connexion ou réessayez plus tard.') { super(message); } }
 export class ApiError extends Error { constructor(public status: number, message: string, public details?: unknown) { super(message); } }
 let accessToken = '';
 let refreshing: Promise<string> | null = null;
@@ -13,6 +13,12 @@ const base = () => (localStorage.getItem('backend_url') || BACKEND_URL).replace(
 const notify = () => window.dispatchEvent(new Event('nstock-session'));
 export function getSession(): SessionState | null {
   try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; }
+}
+// Existing sessions may reopen read-only after expiry; writes still require canWorkOffline.
+export function hasStoredSessionFor(userId: string) {
+  const state = getSession();
+  return Boolean(userId && state?.userId === userId && state.api === base()
+    && Number.isFinite(Date.parse(state.offlineAccessUntil)));
 }
 export function canWorkOffline(now = Date.now()) {
   const state = getSession();

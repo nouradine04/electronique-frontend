@@ -1,10 +1,10 @@
 import { IdentifierPhotoReader } from './IdentifierPhotoReader';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Q } from '@nozbe/watermelondb';
 import { Search, Plus, LoaderCircle } from 'lucide-react';
 import database from '../../db/watermelondb';
 import { useQuery } from '../../db/useQuery';
-import { parseIdentifiers, unitRaw } from '../../services/productUnits';
+import { normalizeIdentifierSearch, parseIdentifiers, unitRaw } from '../../services/productUnits';
 import { recordStockMovement } from '../../services/syncEngine';
 
 function UnitHistory({ id }: { id: string }) {
@@ -19,10 +19,13 @@ function UnitHistory({ id }: { id: string }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}><button type="button" className="btn btn-secondary" disabled={!page} onClick={() => setPage(p => p - 1)}>Précédent</button><button type="button" className="btn btn-secondary" disabled={events.length <= 10} onClick={() => setPage(p => p + 1)}>Suivant</button></div>
   </div>;
 }
-export function UnitInventory({ product, userName }: { product: any; userName: string }) {
-  const [search, setSearch] = useState(''), [page, setPage] = useState(0), [expanded, setExpanded] = useState('');
+export function UnitInventory({ product, userName, initialSearch = '' }: { product: any; userName: string; initialSearch?: string }) {
+  const [search, setSearch] = useState(initialSearch), [page, setPage] = useState(0), [expanded, setExpanded] = useState('');
   const [receiving, setReceiving] = useState(false), [text, setText] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const units = useQuery(database.get('product_units').query(Q.where('product_id', product.id), Q.where('identifier', Q.like(`%${Q.sanitizeLikeString(search.trim().toUpperCase())}%`)), Q.sortBy('identifier', Q.asc), Q.skip(page * 20), Q.take(21)));
+  const units = useQuery(database.get('product_units').query(Q.where('shop_id', product.shopId), Q.where('product_id', product.id), Q.where('identifier', Q.like(`%${Q.sanitizeLikeString(normalizeIdentifierSearch(search))}%`)), Q.sortBy('identifier', Q.asc), Q.skip(page * 20), Q.take(21)));
+  useEffect(() => {
+    if (initialSearch && units.length === 1) setExpanded(units[0].id);
+  }, [initialSearch, units]);
   async function receive(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try {
@@ -33,6 +36,7 @@ export function UnitInventory({ product, userName }: { product: any; userName: s
     } catch (error) { setError(error.message); } finally { setBusy(false); }
   }
   return <section className="pd-content">
+    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 0 }}>Chaque appareil possède son propre identifiant. Ouvrez une ligne pour voir sa réception, ses ventes et ses retours.</p>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 180px' }}><Search size={18} /><input className="input-field" aria-label="Rechercher un appareil" placeholder="IMEI / numéro de série" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} style={{ minWidth: 0, width: '100%' }} /></label>
       <button type="button" className="btn btn-primary" onClick={() => setReceiving(v => !v)}><Plus size={16} /> Réception</button>

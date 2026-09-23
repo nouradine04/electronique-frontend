@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { disableWebPush } from '../services/webPush';
-import { logoutSession } from '../services/session';
+import { hasStoredSessionFor, logoutSession } from '../services/session';
 import { setBackupPassword } from '../services/backupCredential';
 import { useQuery } from '../db/useQuery.js';
 import { queryAllShops, createShop, database } from '../db/queries.js';
@@ -38,7 +38,7 @@ export function ShopProvider({ children }) {
         ? storedShops.filter(shop => shop.accountId === userShop.accountId)
         : [];
       const selectedShop = allowedShops.find(shop => shop.id === storedShopId) || userShop || null;
-      const validSession = Boolean(localUser?.isActive && selectedShop);
+      const validSession = Boolean(localUser?.isActive && selectedShop && hasStoredSessionFor(localUser.id));
       setCurrentShop(selectedShop);
       setHasValidLocalSession(validSession);
       if (validSession) localStorage.setItem('currentShopId', selectedShop.id);

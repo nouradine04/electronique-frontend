@@ -1,3 +1,4 @@
+import { useUnitProductMatches } from '../../../components/stock/useUnitProductMatches';
 import { variantLabel } from './constants';
 
 import { validateSelectedUnits, prepareUnitEvent, unitRaw } from '../../../services/productUnits';
@@ -23,6 +24,7 @@ export function usePos({ setActiveTab }) {
 
   // POS State
   const [searchQuery, setSearchQuery] = useState('');
+  const unitMatches = useUnitProductMatches(currentShop?.id || '', searchQuery, 'AVAILABLE');
   const [cart, setCart] = useState([]);
   const [showCartSheet, setShowCartSheet] = useState(false);
 
@@ -64,9 +66,9 @@ export function usePos({ setActiveTab }) {
       if (String(p.status || '').toUpperCase() !== 'ACTIVE' || Number(p.price || 0) <= 0) return false;
       const n = (p.name || '').toLowerCase();
       const s = (p.sku || '').toLowerCase();
-      return `${n} ${s} ${variantLabel(p)}`.toLowerCase().includes(q);
+      return unitMatches.has(p.id) || `${n} ${s} ${variantLabel(p)}`.toLowerCase().includes(q);
     });
-  }, [allProducts, searchQuery]);
+  }, [allProducts, searchQuery, unitMatches]);
   const productPage = usePagination(filteredProducts, `${currentShop?.id}:${searchQuery}`);
 
   const filteredClients = useMemo(() => {

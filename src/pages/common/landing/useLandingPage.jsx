@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { restoreLocalOwnerFromCloud } from '../../../services/localAuth.js';
 import { closeDesktopVault, isTauriDesktop, openDesktopVault } from '../../../services/desktopVault';
 import { startDesktopBackupForShop } from '../../../services/desktopBackup';
+import { NetworkError } from '../../../services/session';
 import { registerCloudAccount } from '../../../services/cloudAuth';
 import { setBackupPassword } from '../../../services/backupCredential';
 import { useShop } from '../../../context/ShopContext.jsx';
@@ -55,7 +56,6 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
   const [shopName, setShopName] = useState('');
   const [adminName, setAdminName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -94,10 +94,10 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
     }
 
     try {
-      const shopCode = shopName.toUpperCase().replace(/\s+/g, '').slice(0, 4) + Math.floor(1000 + Math.random() * 9000);
+      if (!navigator.onLine) throw new NetworkError('Connexion Internet requise pour créer votre compte.');
 
       if (isTauriDesktop()) {
-        await openDesktopVault(email || phone, password);
+        await openDesktopVault(email, password);
       }
 
       const session = await registerCloudAccount({ shop_name: shopName, name: adminName, email, password });
@@ -114,7 +114,6 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       onLoginSuccess('owner');
     } catch (err) {
       if (isTauriDesktop()) void closeDesktopVault();
-      console.error(err);
       setError(err.message || 'Une erreur est survenue lors de la création de la boutique.');
       setLoading(false);
     }

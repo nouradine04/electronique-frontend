@@ -16,7 +16,7 @@ export function ProductGrid({ searchQuery, setSearchQuery, filteredProducts, pro
               type="text"
               className="input-field"
               style={{ paddingLeft: '40px', height: '40px' }}
-              placeholder="Rechercher un produit..."
+              placeholder="Produit, IMEI ou numéro de série…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />

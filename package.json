@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "test:products": "node --test tests/product-wizard.test.mjs tests/product-units.test.mjs",
+    "test:auth": "node --test tests/cloud-auth.test.mjs tests/registration-flow.test.mjs tests/login-flow.test.mjs tests/session.test.mjs"
   },
   "dependencies": {
     "@nozbe/watermelondb": "^0.27.0",

@@ -27,7 +27,7 @@ function movementLabel(movement) {
   return 'Ajustement';
 }
 
-export function ProductDetailPage({ productId, onBack, onEdit }) {
+export function ProductDetailPage({ productId, onBack, onEdit, initialUnitSearch = '' }) {
   const { userRole, userName } = useShop();
   const isOwner = userRole === 'owner';
   const reducedMotion = useReducedMotion();
@@ -78,14 +78,14 @@ export function ProductDetailPage({ productId, onBack, onEdit }) {
             <div><span>Emplacement</span><strong><MapPin size={14} />{product.location || 'Non défini'}</strong></div>
           </div>
 
-          <Tabs.Root defaultValue="information" className="pd-tabs">
+          <Tabs.Root key={product.id} defaultValue={product.trackingMode !== 'QUANTITY' ? 'units' : 'information'} className="pd-tabs">
             <Tabs.List className="pd-tabs-list" aria-label="Détails du produit">
               {product.trackingMode !== 'QUANTITY' && <Tabs.Trigger value="units">Appareils</Tabs.Trigger>}
               <Tabs.Trigger value="information">Informations</Tabs.Trigger>
               <Tabs.Trigger value="movements">Mouvements <span>{movements.length}</span></Tabs.Trigger>
             </Tabs.List>
 
-            {product.trackingMode !== 'QUANTITY' && <Tabs.Content value="units"><UnitInventory product={product} userName={userName} /></Tabs.Content>}
+            {product.trackingMode !== 'QUANTITY' && <Tabs.Content value="units"><UnitInventory key={`${product.id}:${initialUnitSearch}`} product={product} userName={userName} initialSearch={initialUnitSearch} /></Tabs.Content>}
             <Tabs.Content value="information" asChild>
               <motion.div className="pd-content" initial={reducedMotion ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}>
                 {product.description && <p className="pd-description">{product.description}</p>}

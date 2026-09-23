@@ -19,7 +19,8 @@ import {
   AlertCircle,
   Crown
 } from 'lucide-react';
-import logoImg from '../../assets/logo.png';
+import { BrandLogo } from '../BrandLogo';
+import './navigation.css';
 
 export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
   const { t, i18n } = useTranslation();
@@ -122,7 +123,7 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
         </div>
       )}
 
-      <header className="surface-panel" style={{
+      <header className="surface-panel app-header" style={{
         height: '64px',
         borderTop: 'none',
         borderLeft: 'none',
@@ -140,7 +141,7 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
 
         {/* Left side: Search (Desktop/Tablet) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="mobile-app-brand"><img src={logoImg} alt="NStock" /><span>{currentShop?.name}</span></div>
+          <div className="mobile-app-brand"><BrandLogo /></div>
           <div className="desktop-only" style={{ position: 'relative', width: '380px' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
@@ -162,6 +163,8 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
 
         {/* Right Controls */}
         <div className="app-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
+          <button type="button" className="header-logout" onClick={onLogout}><LogOut size={18} aria-hidden="true" /><span>Déconnexion</span></button>
 
           {/* Language Toggle */}
           <button
@@ -299,7 +302,6 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
                   )}
 
                   {/* Add new shop */}
-                  <button type="button" onClick={onLogout} className="btn btn-secondary" style={{ margin: '10px 16px', minHeight: 44 }}>Se déconnecter</button>
                   <div style={{ borderTop: '1px solid var(--border-color)', padding: '8px 0' }}>
                     <button
                       onClick={() => { setShopError(''); setShowAddShopModal(true); setShowShopMenu(false); }}
