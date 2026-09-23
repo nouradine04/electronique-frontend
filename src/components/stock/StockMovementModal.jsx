@@ -1,15 +1,17 @@
+import { IdentifierPhotoReader } from './IdentifierPhotoReader';
 import React, { useState } from 'react';
 import { Plus, Minus, ArrowRightLeft, X, Package } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
 
 export function StockMovementModal({ product, defaultType, onClose, onSubmit }) {
   const { userRole } = useShop();
-  const [type, setType] = useState(defaultType || 'OUT'); // 'IN' | 'OUT'
+  const [type, setType] = useState(product.trackingMode !== 'QUANTITY' ? 'IN' : defaultType || 'OUT'); // 'IN' | 'OUT'
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [deliveryReference, setDeliveryReference] = useState('');
   const [unitCost, setUnitCost] = useState(product.unit_cost || 0);
+  const [identifiers, setIdentifiers] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
@@ -27,6 +29,7 @@ export function StockMovementModal({ product, defaultType, onClose, onSubmit }) 
     }
 
     onSubmit({
+      identifiers,
       product_id: product.id,
       product_name: product.name,
       type,
@@ -43,7 +46,7 @@ export function StockMovementModal({ product, defaultType, onClose, onSubmit }) 
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px'
     }}>
-      <div style={{ width: '100%', maxWidth: '460px', padding: '24px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
+      <div style={{ width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto', padding: '24px', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
         
         {/* Modal Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -98,7 +101,7 @@ export function StockMovementModal({ product, defaultType, onClose, onSubmit }) 
             <button
               type="button"
               className={`btn ${type === 'OUT' ? 'btn-danger' : 'btn-secondary'}`}
-              onClick={() => setType('OUT')}
+              disabled={product.trackingMode !== 'QUANTITY'} onClick={() => setType('OUT')}
             >
               <Minus size={16} /> Sortie (Retrait)
             </button>
@@ -128,6 +131,9 @@ export function StockMovementModal({ product, defaultType, onClose, onSubmit }) 
             />
           </div>
 
+          {product.trackingMode !== 'QUANTITY' && type === 'IN' && <><IdentifierPhotoReader mode={product.trackingMode} value={identifiers} onChange={setIdentifiers} /><label style={{ display: 'grid', gap: 8, marginBottom: 16 }}>Identifiants des appareils *
+            <textarea className="input-field" value={identifiers} onChange={e => setIdentifiers(e.target.value)} rows={3} placeholder="Un IMEI ou numéro de série par ligne" required />
+          </label></>}
           {/* Reason Input */}
           {type === 'IN' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px', marginBottom: '16px' }}>

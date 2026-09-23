@@ -1,4 +1,5 @@
 // Secure local encryption utility using browser SubtleCrypto API (zero dependencies)
+import { getBackupPassword } from '../services/backupCredential';
 
 const SALT = new Uint8Array([89, 12, 99, 43, 21, 88, 54, 76, 12, 90, 32, 11, 8, 9, 3, 2]);
 
@@ -76,7 +77,8 @@ export async function decryptText(encryptedBase64, key) {
 
 // Helper to get or derive key from session storage
 export async function getSessionKey() {
-  const savedPin = sessionStorage.getItem('encryption_pin') || 'electro_default_secret_key';
+  const savedPin = getBackupPassword();
+  if (!savedPin) throw new Error('Reconnectez-vous pour déverrouiller le chiffrement des sauvegardes.');
   return deriveKey(savedPin);
 }
 
@@ -133,7 +135,7 @@ export function decryptSync(base64Text, key = 'electro_default_secret_key') {
     }
 
     const candidateKeys = [
-      sessionStorage.getItem('encryption_pin'), // Active login password goes first!
+      getBackupPassword(),
       key,
       'electro_default_secret_key',
       'admin',

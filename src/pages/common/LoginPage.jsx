@@ -1,3 +1,4 @@
+import { AppErrorPage } from '../../components/errors/AppErrorPage';
 import { Reveal } from '../../components/Reveal';
 import React, { useState } from 'react';
 import { Lock, UserRound } from 'lucide-react';
@@ -13,6 +14,9 @@ import { FormDivider, FormField, FormInput } from '../../components/ui/FormContr
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
 import { closeDesktopVault, isTauriDesktop, openDesktopVault } from '../../services/desktopVault';
 import { restoreWatermelonFromDesktop, startDesktopBackupForShop } from '../../services/desktopBackup';
+import { canWorkOffline, getSession, NetworkError, SessionError } from '../../services/session';
+import { acceptSession, sessionRequest } from '../../services/session';
+import { setBackupPassword } from '../../services/backupCredential';
 
 export function LoginPage({ onLoginSuccess, onNavigate }) {
   const { switchRole, switchShop } = useShop();
@@ -20,49 +24,41 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [connectionError, setConnectionError] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!identifier.trim()) { setError('Saisissez votre email ou votre numéro de téléphone.'); return; }
+    if (!identifier.trim()) { setError('Saisissez votre email.'); return; }
     if (!password) { setError('Saisissez votre mot de passe.'); return; }
     setLoading(true);
+    setConnectionError(false);
     setError('');
 
     try {
       let user;
       if (isTauriDesktop()) {
         await openDesktopVault(identifier, password);
-        try {
-          user = await loginLocalUser(identifier, password);
-        } catch (localError) {
-          const restored = await restoreWatermelonFromDesktop();
-          if (!restored) throw localError;
-          user = await loginLocalUser(identifier, password);
-        }
-      } else {
-        try {
-          user = await loginLocalUser(identifier, password);
-        } catch (localError) {
-          const cloudSession = await loginCloudAccount(identifier, password).catch(() => null);
-          if (!cloudSession) throw localError;
-          user = await restoreLocalOwnerFromCloud(cloudSession, password);
-        }
+        await restoreWatermelonFromDesktop();
       }
-      const localShop = await database.get('shops').find(user.shopId);
-      if (String(user.role).toLowerCase() === 'owner') {
-        await ensureCloudOwnerAccount(localShop, user, password).catch(cloudError => {
-          console.warn('[Compte cloud] Connexion différée.', cloudError.message);
-        });
+      try {
+        const cloudSession = await loginCloudAccount(identifier, password);
+        user = await restoreLocalOwnerFromCloud(cloudSession, password);
+      } catch (cloudError) {
+        if (!(cloudError instanceof NetworkError)) throw cloudError;
+        if (!canWorkOffline()) { if (!getSession()) throw cloudError; throw new SessionError('Reconnexion requise avec Internet. Vos données locales sont conservées.'); }
+        user = await loginLocalUser(identifier, password);
+        if (user.id !== getSession()?.userId) throw new SessionError('Première connexion sur cet appareil : Internet requis.');
       }
       const { role, name } = user;
       await switchShop(user.shopId);
       await startDesktopBackupForShop(user.shopId);
-      sessionStorage.setItem('encryption_pin', password);
+      setBackupPassword(password);
       switchRole(role, name, user.id);
       setLoading(false);
       onLoginSuccess(role);
 
     } catch (err) {
+      if (err instanceof NetworkError) setConnectionError(true);
       if (isTauriDesktop()) void closeDesktopVault();
       setError(err.message || 'Erreur lors de la connexion');
       setLoading(false);
@@ -72,22 +68,14 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
   const completeGoogleLogin = async profile => {
     setLoading(true); setError('');
     try {
-      let user;
       if (isTauriDesktop()) {
-        await openDesktopVault(profile.email, profile.sub);
-        try {
-          user = await loginLocalGoogleUser(profile.email);
-        } catch (localError) {
-          const restored = await restoreWatermelonFromDesktop();
-          if (!restored) throw localError;
-          user = await loginLocalGoogleUser(profile.email);
-        }
-      } else {
-        user = await loginLocalGoogleUser(profile.email);
+        throw new Error('Sur ordinateur, utilisez votre mot de passe pour ouvrir le coffre local.');
       }
+      const cloudSession = await sessionRequest('/auth/google/login', { credential: profile.credential });
+      await acceptSession(cloudSession);
+      const user = await restoreLocalOwnerFromCloud(cloudSession, null);
       await switchShop(user.shopId);
       await startDesktopBackupForShop(user.shopId);
-      sessionStorage.setItem('encryption_pin', profile.sub);
       switchRole(user.role, user.name, user.id);
       onLoginSuccess(user.role);
     } catch (loginError) {
@@ -96,6 +84,8 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
     }
     finally { setLoading(false); }
   };
+
+  if (connectionError) return <AppErrorPage kind="connection" onBack={() => setConnectionError(false)} onRetry={() => { void handleSubmit({ preventDefault() {} }); }} />;
 
   if (loading) return <LoadingScreen label="Connexion à votre boutique…" />;
 
@@ -199,7 +189,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
 
           <form onSubmit={handleSubmit} noValidate>
             
-            <FormField id="login-identifier" label="Email ou téléphone" error={error && !identifier ? 'Champ obligatoire.' : null}>
+            <FormField id="login-identifier" label="Email" error={error && !identifier ? 'Champ obligatoire.' : null}>
                 <FormInput
                   id="login-identifier"
                   leadingIcon={<UserRound size={18} />}
@@ -208,7 +198,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
                   autoComplete="username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="Email ou téléphone"
+                  placeholder="Votre email"
                   aria-invalid={Boolean(error) && !identifier}
                 />
             </FormField>

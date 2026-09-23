@@ -1,3 +1,4 @@
+import { prepareReceivedUnits, validateSelectedUnits, prepareUnitEvent, unitRaw } from '../services/productUnits';
 /**
  * WatermelonDB Query & Mutation helpers
  *
@@ -6,6 +7,9 @@
  */
 import { Q, columnName } from '@nozbe/watermelondb';
 import { markLocalChangesAsSynced } from '@nozbe/watermelondb/sync/impl';
+import { protectedEntityIds, prepareOperation } from '../services/operationQueue';
+import { syncDependencies } from '../services/syncConflicts';
+import { acknowledgeVersions } from '../services/acknowledgeVersions';
 import database from './watermelondb';
 export { database };
 
@@ -28,9 +32,9 @@ const syncCollections = [
   { table: 'categories', key: 'categories', collection: categories, shopColumn: 'shop_id' },
   { table: 'products', key: 'products', collection: products, shopColumn: 'shop_id' },
   { table: 'clients', key: 'clients', collection: clients, shopColumn: 'shop_id' },
-  { table: 'sales', key: 'sales', collection: sales, shopColumn: 'shop_id' },
+  { orderColumn: 'date', table: 'sales', key: 'sales', collection: sales, shopColumn: 'shop_id' },
   { table: 'payments', key: 'payments', collection: payments, shopColumn: 'shop_id' },
-  { table: 'stock_movements', key: 'stockMovements', collection: stockMovements, shopColumn: 'shop_id' },
+  { orderColumn: 'date', table: 'stock_movements', key: 'stockMovements', collection: stockMovements, shopColumn: 'shop_id' },
   { table: 'returns', key: 'returns', collection: returns, shopColumn: 'shop_id' },
   { table: 'expenses', key: 'expenses', collection: expenses, shopColumn: 'shop_id' },
   { table: 'invoices', key: 'invoices', collection: invoices, shopColumn: 'shop_id' },
@@ -40,6 +44,15 @@ const statusColumn = columnName('_status');
 
 function syncScope(config, shopId) {
   return shopId ? [Q.where(config.shopColumn, shopId)] : [];
+}
+
+function eligibleSyncScope(config, shopId, excluded) {
+  const conditions = syncScope(config, shopId);
+  if (excluded[config.table]?.length) conditions.push(Q.where('id', Q.notIn(excluded[config.table])));
+  for (const [column, table] of Object.entries(syncDependencies[config.table] || {})) {
+    if (excluded[table]?.length) conditions.push(Q.or(Q.where(column, null), Q.where(column, Q.notIn(excluded[table]))));
+  }
+  return conditions;
 }
 
 // ─── SHOPS ────────────────────────────────────────────────────────────────────
@@ -87,7 +100,12 @@ export const queryProductsInStock = (shopId) =>
 
 export const createProduct = async (data) => {
   return database.write(async () => {
-    return products.create(p => {
+    const quantity = Number(data.quantity || 0);
+    if (!Number.isSafeInteger(quantity) || quantity < 0) throw new Error('Quantité invalide.');
+    const tracking = data.tracking_mode || 'QUANTITY';
+    if (!['QUANTITY', 'IMEI', 'SERIAL'].includes(tracking)) throw new Error('Suivi invalide.');
+    const product = products.prepareCreate(p => {
+      p.trackingMode = tracking;
       p.shopId = data.shop_id;
       p.categoryId = data.category_id || '';
       p.name = data.name;
@@ -118,12 +136,26 @@ export const createProduct = async (data) => {
       p.addedAt = data.added_at || new Date().toISOString();
       p.synced = false;
     });
+    const units = await prepareReceivedUnits(database, product, data.identifiers || '', quantity);
+    const operations = [product, ...units];
+    if (quantity > 0) {
+      operations.push(stockMovements.prepareCreate(m => {
+        m.shopId = data.shop_id; m.productId = product.id; m.type = 'IN'; m.quantity = quantity;
+        m.reason = 'Stock initial'; m.date = new Date().toISOString(); m.userName = data.added_by || ''; m.synced = false;
+      }));
+      const journal = await prepareOperation(database, data.shop_id, operations, { kind: 'stock', stock_before: 0 });
+      operations.push(...journal);
+    }
+    await database.batch(...operations);
+    return product;
   });
 };
 
 export const updateProduct = async (product, data) => {
   return database.write(async () => {
     product = await products.find(product.id);
+    if (product.trackingMode !== 'QUANTITY' && data.quantity !== undefined && Number(data.quantity) !== product.quantity) throw new Error('Modifiez les unités identifiées depuis le stock.');
+    if (data.tracking_mode && data.tracking_mode !== product.trackingMode) throw new Error('Le mode de suivi ne peut pas être changé sur une fiche existante.');
     return product.update(p => {
       if (data.name !== undefined) p.name = data.name;
       if (data.description !== undefined) p.description = data.description;
@@ -232,6 +264,7 @@ export const processSaleReturn = async ({
   refund_amount = 0,
   processed_by = '',
   authorized_seller = '',
+  unit_ids = [],
 }) => {
   const returnedQuantity = Number(quantity);
   const refundAmount = Number(refund_amount) || 0;
@@ -251,19 +284,25 @@ export const processSaleReturn = async ({
     throw new Error('Un retour avec remboursement doit retirer un montant positif.');
   }
 
-  const existingReturns = await queryReturnsBySale(sale.id).fetch();
-  const alreadyReturned = existingReturns.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-  const remainingQuantity = Number(sale.quantity || 0) - alreadyReturned;
-  if (returnedQuantity > remainingQuantity) {
-    throw new Error(`Cette vente ne permet plus que ${remainingQuantity} retour(s).`);
-  }
-
-  const remainingValue = (Number(sale.totalPrice || sale.total_price || 0) / Math.max(1, Number(sale.quantity || 1))) * remainingQuantity;
-  if (refundAmount > remainingValue) {
-    throw new Error('Le remboursement dépasse le montant encore retournable.');
-  }
-
   return database.write(async () => {
+    if (sale.productId !== product.id || product.shopId !== sale.shopId || (shop_id && shop_id !== sale.shopId)) throw new Error('Vente et produit incompatibles.');
+    const existingReturns = await queryReturnsBySale(sale.id).fetch();
+    const alreadyReturned = existingReturns.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const remainingQuantity = Number(sale.quantity || 0) - alreadyReturned;
+    if (returnedQuantity > remainingQuantity) {
+      throw new Error(`Cette vente ne permet plus que ${remainingQuantity} retour(s).`);
+    }
+
+    const remainingValue = (Number(sale.totalPrice || sale.total_price || 0) / Math.max(1, Number(sale.quantity || 1))) * remainingQuantity;
+    if (refundAmount > remainingValue) {
+      throw new Error('Le remboursement dépasse le montant encore retournable.');
+    }
+
+    const selectedUnits = await validateSelectedUnits(database, product, unit_ids, returnedQuantity, 'SOLD');
+    for (const unit of selectedUnits) {
+      const events = await database.get('unit_events').query(Q.where('unit_id', unit.id), Q.where('sale_id', sale.id)).fetch();
+      if (!events.some(event => unitRaw(event).kind === 'SOLD') || events.some(event => unitRaw(event).kind === 'RETURNED')) throw new Error('Cet appareil n’est pas retournable sur cette vente.');
+    }
     const now = new Date().toISOString();
     const operations = [];
     const returnRecord = returns.prepareCreate(record => {
@@ -308,7 +347,12 @@ export const processSaleReturn = async ({
       }));
     }
 
-    await database.batch(...operations);
+    for (const unit of selectedUnits) {
+      operations.push(unit.prepareUpdate(record => { record._setRaw('state', restock ? 'AVAILABLE' : 'QUARANTINE'); record._setRaw('synced', false); }));
+      operations.push(prepareUnitEvent(database, { shop_id: sale.shopId, product_id: product.id, unit_id: unit.id, kind: 'RETURNED', sale_id: sale.id, return_id: returnRecord.id, client_id: sale.clientId || null, amount: refundAmount / returnedQuantity, date: now }));
+    }
+    const journal = await prepareOperation(database, sale.shopId, operations, { kind: 'return' });
+    await database.batch(...operations, ...journal);
     return returnRecord;
   });
 };
@@ -444,7 +488,7 @@ const seedDefaultShop = async () => {
  * la file d'attente durable native : created, updated puis synced après accusé
  * de réception. On évite ainsi de charger toutes les écritures hors ligne.
  */
-export const getUnsyncedRecords = async (shopId, includeUsers = true, limit = 500) => {
+export const getUnsyncedRecords = async (shopId, includeUsers = true, limit = 500, excluded = {}) => database.read(async () => {
   const safeLimit = Math.min(Math.max(Number(limit) || 500, 1), 500);
   let remaining = safeLimit;
   const result = { total: 0, changeStates: {}, syncSnapshot: { changes: {}, affectedRecords: [] } };
@@ -457,28 +501,31 @@ export const getUnsyncedRecords = async (shopId, includeUsers = true, limit = 50
     result.syncSnapshot.changes[snapshotTable] = { created: [], updated: [], deleted: [] };
 
     if (remaining === 0 || (config.ownerOnly && !includeUsers)) continue;
-    const scope = syncScope(config, shopId);
-    const created = await config.collection.query(
-      Q.where(statusColumn, 'created'),
-      ...scope,
-      Q.take(remaining),
-    ).fetch();
+    const scope = eligibleSyncScope(config, shopId, excluded);
+    const eligible = async status => {
+      const found = [];
+      let offset = 0;
+      while (found.length < remaining) {
+        const candidates = await config.collection.query(Q.where(statusColumn, status), ...scope,
+          Q.sortBy(config.orderColumn || 'id', Q.asc), ...(config.orderColumn ? [Q.sortBy('id', Q.asc)] : []),
+          Q.skip(offset), Q.take(500)).fetch();
+        const protectedIds = await protectedEntityIds(database, snapshotTable, candidates.map(row => row.id));
+        found.push(...candidates.filter(row => !protectedIds.has(row.id)).slice(0, remaining - found.length));
+        if (candidates.length < 500) break;
+        offset += candidates.length;
+      }
+      return found;
+    };
+    const created = await eligible('created');
     remaining -= created.length;
-
-    const updated = remaining > 0
-      ? await config.collection.query(
-          Q.where(statusColumn, 'updated'),
-          ...scope,
-          Q.take(remaining),
-        ).fetch()
-      : [];
+    const updated = remaining > 0 ? await eligible('updated') : [];
     remaining -= updated.length;
 
     // Les lignes supprimées ne sont plus interrogeables comme des modèles,
     // mais l'adaptateur conserve leurs identifiants jusqu'à l'accusé serveur.
-    const deleted = remaining > 0
-      ? (await database.adapter.getDeletedRecords(snapshotTable)).slice(0, remaining)
-      : [];
+    const tombstones = remaining > 0 ? await database.adapter.getDeletedRecords(snapshotTable) : [];
+    const protectedDeleted = await protectedEntityIds(database, snapshotTable, tombstones);
+    const deleted = tombstones.filter(id => !excluded[config.table]?.includes(id) && !protectedDeleted.has(id)).slice(0, remaining);
     remaining -= deleted.length;
 
     const records = [...created, ...updated];
@@ -494,28 +541,38 @@ export const getUnsyncedRecords = async (shopId, includeUsers = true, limit = 50
   }
 
   return result;
-};
+});
 
-export const getUnsyncedCount = async (shopId, includeUsers = true) => {
+export const getUnsyncedCount = async (shopId, includeUsers = true, excluded = {}) => {
   const counts = await Promise.all(syncCollections.map(async config => {
     if (config.ownerOnly && !includeUsers) return 0;
-    const scope = syncScope(config, shopId);
+    const scope = eligibleSyncScope(config, shopId, excluded);
     const snapshotTable = config.localTable || config.table;
     const [created, updated, deleted] = await Promise.all([
       config.collection.query(Q.where(statusColumn, 'created'), ...scope).fetchCount(),
       config.collection.query(Q.where(statusColumn, 'updated'), ...scope).fetchCount(),
       database.adapter.getDeletedRecords(snapshotTable),
     ]);
-    return created + updated + deleted.length;
+    return created + updated + deleted.filter(id => !excluded[config.table]?.includes(id)).length;
   }));
   return counts.reduce((total, count) => total + count, 0);
 };
 
-export const markAsSynced = async (batch, rejectedIds = {}) => {
+export const markAsSynced = async (batch, rejectedIds = {}, versions = {}) => {
   if (!batch?.syncSnapshot || batch.total === 0) return;
   const localRejectedIds = {
     ...rejectedIds,
     local_users: rejectedIds.users || [],
   };
+  // Persist the server base version first. If the process stops between these
+  // writes, the record remains pending and its identical replay is safe.
+  await acknowledgeVersions(database, versions);
+  for (const [table, entries] of Object.entries(versions)) {
+    const snapshot = batch.syncSnapshot.changes[table === 'users' ? 'local_users' : table];
+    if (!snapshot) continue;
+    for (const raw of [...snapshot.created, ...snapshot.updated]) {
+      if (entries[raw.id] !== undefined) raw.version = entries[raw.id];
+    }
+  }
   await markLocalChangesAsSynced(database, batch.syncSnapshot, localRejectedIds);
 };

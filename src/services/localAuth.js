@@ -1,6 +1,7 @@
 import { Q } from '@nozbe/watermelondb';
 import database, { flushLocalDatabase } from '../db/watermelondb.js';
 import { isTauriDesktop, upsertDesktopRecord } from './desktopVault';
+import { prepareLocalUser } from './prepareLocalUser.js';
 
 const users = database.get('local_users');
 const normalizeEmail = email => String(email || '').trim().toLowerCase().replace(/\\@/g, '@');
@@ -41,10 +42,7 @@ async function credentials(password) {
 }
 
 function prepareUser(data) {
-  return users.prepareCreate(user => {
-    for (const [field, value] of Object.entries(data)) user._setRaw(field, value);
-    user._setRaw('synced', data.synced === true);
-  });
+  return prepareLocalUser(users, data);
 }
 
 async function persistDesktopRegistration(shop, user, categories) {
@@ -122,8 +120,11 @@ export async function restoreLocalOwnerFromCloud(session, password) {
   const remoteUser = session?.user;
   const remoteShop = session?.shop;
   if (!remoteUser?.id || !remoteShop?.id) throw new Error('Sauvegarde cloud incomplète.');
-  try { return await users.find(remoteUser.id); } catch { /* restauration */ }
-  const hashed = await credentials(password);
+  let existingUser = null;
+  try { existingUser = await users.find(remoteUser.id); } catch { /* restauration */ }
+  const hashed = password ? await credentials(password) : existingUser
+    ? { password_hash: existingUser.passwordHash, password_salt: existingUser.passwordSalt }
+    : await credentials(crypto.randomUUID());
   const restored = await database.write(async () => {
     let shop;
     let shopOperation = null;
@@ -140,20 +141,33 @@ export async function restoreLocalOwnerFromCloud(session, password) {
         record.subscriptionPlan = remoteShop.subscription_plan || 'standard';
         record.accountId = remoteUser.tenant_id;
         record.synced = true;
+        record._setRaw('version', Number(remoteShop.version) || 1);
       });
       shopOperation = shop;
     }
-    const user = prepareUser({
+    const data = {
       id: remoteUser.id,
       shop_id: remoteShop.id,
       name: remoteUser.name,
       email: normalizeEmail(remoteUser.email),
       phone: '', role: String(remoteUser.role || 'OWNER').toLowerCase() === 'owner' ? 'owner' : 'manager',
       is_active: true, account_created_at: new Date().toISOString(), synced: true, ...hashed,
-    });
+      version: Number(remoteUser.version) || 1,
+    };
+    const previousStatus = existingUser?._raw._status;
+    const previousChanged = existingUser?._raw._changed;
+    const user = existingUser ? existingUser.prepareUpdate(record => {
+      for (const field of ['password_hash', 'password_salt', 'role', 'is_active', 'shop_id']) record._setRaw(field, data[field]);
+      // Les identifiants de connexion sont un cache privé, pas une modification métier à renvoyer.
+      record._raw._status = previousStatus;
+      record._raw._changed = previousChanged;
+      if (previousStatus === 'synced') record._raw.version = data.version;
+    }) : prepareUser(data);
+    if (!existingUser) { user._raw._status = 'synced'; user._raw._changed = ''; }
+    if (shopOperation) { shopOperation._raw._status = 'synced'; shopOperation._raw._changed = ''; }
     await database.batch(...[shopOperation, user].filter(Boolean));
     return user;
-  });
+  }, 'session-restore');
   await flushLocalDatabase();
   return restored;
 }

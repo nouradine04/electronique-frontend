@@ -109,9 +109,50 @@ export const localUserSchema = {
   columns: [...localUserV3Schema.columns, ...localUserAccountColumns, ...localUserPhoneColumns, ...localUserSyncColumns, ...syncVersionColumns],
 };
 
+export const syncOperationSchema = { name: 'sync_operations', columns: [
+  { name: 'user_id', type: 'string', isIndexed: true },
+  { name: 'shop_id', type: 'string', isIndexed: true },
+  { name: 'payload', type: 'string' },
+  { name: 'created_at', type: 'number', isIndexed: true },
+  { name: 'state', type: 'string', isIndexed: true },
+  { name: 'error', type: 'string', isOptional: true },
+] };
+export const syncOperationLinkSchema = { name: 'sync_operation_links', columns: [
+  { name: 'shop_id', type: 'string', isIndexed: true },
+  { name: 'operation_id', type: 'string', isIndexed: true },
+  { name: 'entity_table', type: 'string', isIndexed: true },
+  { name: 'entity_id', type: 'string', isIndexed: true },
+] };
+
+export const trackingColumns = [{ name: "tracking_mode", type: "string", isOptional: true }];
+export const product_unitsSchema = { name: "product_units", columns: [
+  { name: "shop_id", type: "string", isIndexed: true, isOptional: true },
+  { name: "product_id", type: "string", isIndexed: true, isOptional: true },
+  { name: "identifier", type: "string", isIndexed: true, isOptional: true },
+  { name: "identifier_type", type: "string", isOptional: true },
+  { name: "state", type: "string", isIndexed: true, isOptional: true },
+  { name: "received_at", type: "string", isOptional: true },
+  ...syncVersionColumns, { name: "synced", type: "boolean" },
+] };
+export const unit_eventsSchema = { name: "unit_events", columns: [
+  { name: "shop_id", type: "string", isIndexed: true, isOptional: true },
+  { name: "product_id", type: "string", isIndexed: true, isOptional: true },
+  { name: "unit_id", type: "string", isIndexed: true, isOptional: true },
+  { name: "kind", type: "string", isOptional: true },
+  { name: "sale_id", type: "string", isIndexed: true, isOptional: true },
+  { name: "return_id", type: "string", isOptional: true },
+  { name: "client_id", type: "string", isOptional: true },
+  { name: "date", type: "string", isOptional: true },
+  { name: "amount", type: "number", isOptional: true },
+  { name: "client_name", type: "string", isOptional: true },
+  { name: "client_phone", type: "string", isOptional: true },
+  ...syncVersionColumns, { name: "synced", type: "boolean" },
+] };
 export default appSchema({
-  version: 10,
+  version: 12,
   tables: [
+    tableSchema(product_unitsSchema), tableSchema(unit_eventsSchema),
+    tableSchema(syncOperationSchema), tableSchema(syncOperationLinkSchema),
     tableSchema(localUserSchema),
     tableSchema({
       name: 'shops',
@@ -153,6 +194,7 @@ export default appSchema({
         { name: 'image_url', type: 'string', isOptional: true },
         { name: 'location', type: 'string', isOptional: true },
         ...productCatalogColumns,
+        ...trackingColumns,
         ...syncVersionColumns,
         { name: 'synced', type: 'boolean' }
       ]

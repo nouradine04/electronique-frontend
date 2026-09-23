@@ -218,11 +218,35 @@ fn desktop_vault_status(tenant_id: String, state: State<'_, VaultState>) -> Resu
     Ok(VaultStatus { opened: true, pending_changes, last_pulled_at })
 }
 
+fn session_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new("com.nstock.desktop", "refresh-token").map_err(|_| "Stockage sécurisé indisponible".to_string())
+}
+#[tauri::command]
+fn session_token_set(token: String) -> Result<(), String> {
+    session_entry()?.set_password(&token).map_err(|_| "Enregistrement sécurisé impossible".to_string())
+}
+#[tauri::command]
+fn session_token_get() -> Result<Option<String>, String> {
+    match session_entry()?.get_password() {
+        Ok(token) => Ok(Some(token)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(_) => Err("Lecture du stockage sécurisé impossible".to_string()),
+    }
+}
+#[tauri::command]
+fn session_token_delete() -> Result<(), String> {
+    match session_entry()?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(_) => Err("Suppression du jeton impossible".to_string()),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(VaultState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
+            session_token_set, session_token_get, session_token_delete,
             desktop_vault_open,
             desktop_vault_close,
             desktop_vault_upsert,

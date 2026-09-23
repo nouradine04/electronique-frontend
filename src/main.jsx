@@ -1,3 +1,5 @@
+import { AppErrorBoundary } from './components/errors/AppErrorBoundary';
+import { AppErrorPage } from './components/errors/AppErrorPage';
 import React from 'react';
 import './services/installPrompt';
 import ReactDOM from 'react-dom/client';
@@ -15,6 +17,6 @@ if (import.meta.env.DEV && window.location.hostname === '127.0.0.1') {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <AppErrorBoundary>{['/', '/index.html', '/app', '/app/'].includes(window.location.pathname) ? <App /> : <AppErrorPage kind="not-found" />}</AppErrorBoundary>
   </React.StrictMode>
 );

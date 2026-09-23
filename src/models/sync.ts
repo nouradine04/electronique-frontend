@@ -22,4 +22,6 @@ export interface PushChangesResponse {
   next_cursor: string | null;
   timestamp?: number;
   rejected_ids?: Record<string, string[]>;
+  conflicts?: { table: string; id: string; reason: 'version_conflict' | 'pending_dependency' | 'validation_error'; message?: string }[];
+  versions?: Record<string, Record<string, number>>;
 }

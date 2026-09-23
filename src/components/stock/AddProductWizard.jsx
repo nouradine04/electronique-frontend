@@ -1,4 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { IdentifierPhotoReader } from './IdentifierPhotoReader';
+import { parseIdentifiers } from '../../services/productUnits';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { CameraCapture } from './CameraCapture';
 import { Camera, LoaderCircle, Plus, Search, Smartphone, Trash2, Upload, X, Package, Wallet, ClipboardCheck, Pencil } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
 import { LocalImage } from '../common/LocalImage.jsx';
@@ -52,10 +55,12 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   const initialCategoryId = readInitial(initialData, 'category_id', 'categoryId') || categories[0]?.id || '';
   const [formData, setFormData] = useState({
     id: initialData?.id,
+    tracking_mode: initialData?.trackingMode || 'QUANTITY',
+    identifiers: '',
     name: initialData?.name || '',
     category_id: initialCategoryId,
     description: initialData?.description || '',
-    quantity: Number(initialData?.quantity || 0),
+    quantity: initialData ? Number(initialData.quantity || 0) : '',
     min_stock: Number(readInitial(initialData, 'min_stock', 'minStock') || 5),
     unit_cost: readInitial(initialData, 'unit_cost', 'unitCost'),
     price: initialData?.price ?? '',
@@ -79,6 +84,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     added_at: readInitial(initialData, 'added_at', 'addedAt') || new Date().toISOString(),
   });
   const [catalogQuery, setCatalogQuery] = useState('');
+  const [catalogExpanded, setCatalogExpanded] = useState(false);
   const [catalogResults, setCatalogResults] = useState([]);
   const [catalogStatus, setCatalogStatus] = useState('idle');
   const [catalogOptions, setCatalogOptions] = useState(() => {
@@ -94,11 +100,12 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     }
   });
   const [imageError, setImageError] = useState('');
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const closeCamera = useCallback(() => setCameraOpen(false), []);
   const [step, setStep] = useState(1);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null);
   const [customSpecs, setCustomSpecs] = useState(() => readCustomSpecs(initialData));
 
   useEffect(() => {
@@ -178,6 +185,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   };
 
   const useManualEntry = () => {
+    setCatalogExpanded(false);
     setCatalogResults([]);
     setCatalogStatus('manual');
     setCatalogOptions({ ram: [], storage: [], colors: [] });
@@ -199,6 +207,10 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   const totalSteps = 2;
   const selectedCategory = categories.find(category => category.id === formData.category_id);
   const needsVariant = /t[ée]l[ée]phone|smartphone|phone|tablette/i.test(selectedCategory?.name || '');
+
+  useEffect(() => {
+    if (!initialData && /t[ée]l[ée]phone|smartphone/i.test(selectedCategory?.name || '') && formData.tracking_mode === 'QUANTITY') setFormData(previous => ({ ...previous, tracking_mode: 'IMEI' }));
+  }, [selectedCategory?.name, initialData, formData.tracking_mode]);
 
   const validateStep = current => {
     if (current === 1 && (!formData.name.trim() || !formData.category_id)) return 'Indiquez le nom et la catégorie du produit.';
@@ -257,6 +269,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     }
     setSaving(true);
     try {
+      if (!initialData && finalData.tracking_mode !== 'QUANTITY' && parseIdentifiers(finalData.identifiers, finalData.tracking_mode).length !== finalData.quantity) throw new Error('Indiquez un identifiant par appareil reçu.');
       await Promise.resolve(onSubmit(finalData));
     } catch (error) {
       setFormError(error.message || 'Impossible d’enregistrer le produit. Réessayez.');
@@ -323,7 +336,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
           <StepProgress step={step} total={totalSteps} items={catalogOnly ? [{ label: 'Produit', icon: Package }, { label: 'Vérifier', icon: ClipboardCheck }] : [{ label: 'Produit', icon: Package }, { label: 'Stock', icon: Wallet }]} onSelect={saving ? undefined : page => { setFormError(''); setStep(page); }} />
           {formError && <div className="wizard-error" role="alert">{formError}</div>}
           {step === 1 && <FormStep stepKey={step}>
-          <section className="catalog-picker">
+          {showManualFields && !catalogExpanded ? <button type="button" className="catalog-manual-link" onClick={() => setCatalogExpanded(true)}><Search size={15} /> Rechercher dans le catalogue</button> : <section className="catalog-picker">
             {!hasCatalogSelection && <>
             <label style={labelStyle}>Rechercher un téléphone</label>
             <div style={{ position: 'relative' }}>
@@ -379,7 +392,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
               <span><strong>{formData.name}</strong><small>{formData.image_url ? 'Image chargée' : 'Photo facultative'}</small></span>
               <button type="button" onClick={() => { setCatalogStatus('idle'); setCatalogQuery(''); }}>Changer</button>
             </div>}
-          </section>
+          </section>}
 
           {showManualFields && <div className="manual-product-fields"><div>
             <label htmlFor="product-name" style={labelStyle}>Nom du produit *</label>
@@ -400,9 +413,9 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
           {step === 1 && needsVariant && (hasCatalogSelection || showManualFields) && <section>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
               <Smartphone size={18} color="var(--accent-primary)" />
-              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Caractéristiques de l’appareil</strong>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Quelle variante ?</strong>
             </div>
-            <div className="wizard-field-grid" style={responsiveGrid}>
+            <div className="wizard-field-grid wizard-variant-grid" style={responsiveGrid}>
               {variantField('Capacité', 'storage_capacity', catalogOptions.storage, '256 GB', needsVariant)}
               <div>
                 <label style={labelStyle}>Couleur{needsVariant ? ' *' : ''}</label>
@@ -413,16 +426,12 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
               </div>
             </div>
             <details className="wizard-optional" style={{ marginTop: '14px' }}>
-              <summary>Détails facultatifs de l’appareil</summary>
+              <summary>Plus de caractéristiques · facultatif</summary>
               <div className="wizard-field-grid" style={{ marginTop: '14px', ...responsiveGrid }}>
                 <div><label style={labelStyle}>Marque</label><input name="brand" value={formData.brand} onChange={handleChange} placeholder="Samsung" style={inputStyle} /></div>
                 <div><label style={labelStyle}>Modèle</label><input name="model" value={formData.model} onChange={handleChange} placeholder="Galaxy S24" style={inputStyle} /></div>
                 {variantField('RAM', 'ram', catalogOptions.ram, '8 GB')}
                 <div><label style={labelStyle}>SIM</label><select name="sim_type" value={formData.sim_type} onChange={handleChange} style={inputStyle}><option value="">À préciser</option><option value="SIM simple">SIM simple</option><option value="Double SIM">Double SIM</option><option value="Nano-SIM + eSIM">Nano-SIM + eSIM</option><option value="eSIM">eSIM</option></select></div>
-                <div><label style={labelStyle}>Batterie</label><input name="battery" value={formData.battery} onChange={handleChange} placeholder="5000 mAh" style={inputStyle} /></div>
-                <div><label style={labelStyle}>Écran</label><input name="screen" value={formData.screen} onChange={handleChange} placeholder="6,7 pouces" style={inputStyle} /></div>
-                <div><label style={labelStyle}>Système</label><input name="operating_system" value={formData.operating_system} onChange={handleChange} placeholder="Android 14" style={inputStyle} /></div>
-                <div><label style={labelStyle}>Date de sortie</label><input type="date" name="release_date" value={formData.release_date} onChange={handleChange} style={inputStyle} /></div>
               </div>
             <div style={{ marginTop: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: customSpecs.length ? '10px' : 0 }}>
@@ -443,7 +452,6 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
           </section>}
 
           {step === 1 && <details className="wizard-optional"><summary><Camera size={16} /> Photo, emplacement et description</summary><div className="product-presentation">
-          <div className="wizard-step-heading"><strong>Présenter le produit</strong><span>La photo aide à le retrouver rapidement.</span></div>
           <div>
             <label style={labelStyle}>Emplacement</label>
             <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="Ex : Rayon A-4" style={inputStyle} />
@@ -456,8 +464,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
                 {formData.image_url ? <LocalImage src={formData.image_url} alt="Aperçu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Upload size={20} color="var(--text-muted)" />}
               </button>
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" style={{ display: 'none' }} />
-              <input type="file" ref={cameraInputRef} onChange={handleImageUpload} accept="image/*" capture="environment" style={{ display: 'none' }} />
-              <button type="button" className="btn btn-secondary" onClick={() => cameraInputRef.current?.click()} style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Camera size={15} /> Prendre une photo</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setCameraOpen(true)} style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Camera size={15} /> Prendre une photo</button>
               <button type="button" className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} style={{ padding: '7px 12px', fontSize: '0.8rem' }}>Choisir une image</button>
               {formData.image_url && <button type="button" onClick={() => setFormData(previous => ({ ...previous, image_url: null }))} style={{ padding: '7px 8px', fontSize: '0.8rem', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Supprimer</button>}
             </div>
@@ -472,10 +479,19 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
               {formData.image_url ? <LocalImage src={formData.image_url} alt="" /> : <Package size={20} />}
               <span><strong>{formData.name || 'Produit sans nom'}</strong><small>{selectedCategory?.name || 'Catégorie à préciser'}</small></span><Pencil size={16} />
             </button>
-            <div className="wizard-step-heading"><strong>Définir le stock</strong><span>Indiquez seulement la quantité disponible et le seuil d’alerte.</span></div>
+            <div className="wizard-step-heading"><strong>Combien d’articles reçus ?</strong></div>
+            <label style={labelStyle}>Suivi des appareils
+              <select name="tracking_mode" value={formData.tracking_mode} onChange={handleChange} disabled={!!initialData} style={inputStyle}>
+                <option value="QUANTITY">En quantité · accessoires</option><option value="IMEI">Par IMEI · téléphones</option><option value="SERIAL">Par numéro de série</option>
+              </select>
+            </label>
+            {!initialData && formData.tracking_mode !== 'QUANTITY' && <><IdentifierPhotoReader mode={formData.tracking_mode} value={formData.identifiers} onChange={identifiers => setFormData(previous => ({ ...previous, identifiers }))} /><label style={labelStyle}>{formData.tracking_mode === 'IMEI' ? 'IMEI principal' : 'Numéro de série'} · un par ligne *
+              <textarea name="identifiers" value={formData.identifiers} onChange={handleChange} rows={3} style={{ ...inputStyle, height: 'auto', resize: 'vertical' }} placeholder="Un identifiant par appareil" />
+              <small>Les identifiants sont vérifiés avant l’enregistrement.</small>
+            </label></>}
             <div className="wizard-field-grid" style={responsiveGrid}>
-              <div><label htmlFor="product-quantity" style={labelStyle}>Quantité initiale *</label><input id="product-quantity" type="number" name="quantity" min="0" value={formData.quantity} onChange={handleChange} style={inputStyle} required /></div>
-              <div><label htmlFor="product-min-stock" style={labelStyle}>Seuil d’alerte *</label><input id="product-min-stock" type="number" name="min_stock" min="1" value={formData.min_stock} onChange={handleChange} style={inputStyle} required /></div>
+              <div><label htmlFor="product-quantity" style={labelStyle}>Quantité initiale *</label><input id="product-quantity" disabled={!!initialData && formData.tracking_mode !== 'QUANTITY'} type="number" name="quantity" min="0" value={formData.quantity} onChange={handleChange} style={inputStyle} required /></div>
+              <details className="wizard-optional"><summary>Alerte de stock · {formData.min_stock || 5} articles</summary><label htmlFor="product-min-stock" style={labelStyle}>Me prévenir en dessous de</label><input id="product-min-stock" type="number" name="min_stock" min="1" value={formData.min_stock} onChange={handleChange} style={inputStyle} /></details>
             </div>
 
             {!isOwner && (
@@ -511,6 +527,11 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
           </div>
         </form>
       </div>
+      {cameraOpen && <CameraCapture onClose={closeCamera} onCapture={async file => {
+        const reference = await saveLocalImage(file);
+        setFormData(previous => ({ ...previous, image_url: reference }));
+        setImageError('');
+      }} />}
     </div>
   );
 }

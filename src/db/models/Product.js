@@ -2,6 +2,8 @@ import { Model } from '@nozbe/watermelondb';
 
 export default class Product extends Model {
   static table = 'products';
+  get trackingMode() { return this._getRaw('tracking_mode') || 'QUANTITY'; }
+  set trackingMode(value) { this._setRaw('tracking_mode', value); }
 
   get shopId() { return this._getRaw('shop_id'); }
   set shopId(val) { this._setRaw('shop_id', val); }

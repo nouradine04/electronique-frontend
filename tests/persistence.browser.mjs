@@ -1,0 +1,34 @@
+import fs from 'node:fs';
+import {createServer} from '../node_modules/vite/dist/node/index.js';
+import react from '../node_modules/@vitejs/plugin-react/dist/index.js';
+const { chromium } = await import(process.env.NSTOCK_PLAYWRIGHT_MODULE || 'playwright');
+const pageFile=new URL('../__persistence-qa.html',import.meta.url);
+const profile=fs.mkdtempSync('/tmp/nstock-persistence-');
+fs.writeFileSync(pageFile,`<html><script type="module">import db from '/src/db/watermelondb.js';import * as queries from '/src/db/queries.js';window.qa={db,queries};</script></html>`);
+const server=await createServer({configFile:false,root:new URL('..',import.meta.url).pathname,define:{global:'globalThis'},plugins:[{name:'test-session',enforce:'pre',load(id){if(id.split('?')[0].endsWith('/services/session.ts'))return 'export const assertSessionWritable=()=>{};';}},react({include:/\.(jsx|js|tsx|ts)$/,babel:{plugins:[['@babel/plugin-proposal-decorators',{legacy:true}],['@babel/plugin-proposal-class-properties',{loose:true}]]}})],server:{host:'127.0.0.1',port:3198,strictPort:true}});
+let context;
+try{
+ await server.listen();
+ const open=async()=>{context=await chromium.launchPersistentContext(profile,{headless:true,channel:'chrome'});const page=await context.newPage();page.on('pageerror',e=>console.error(e.message));await page.goto('http://127.0.0.1:3198/__persistence-qa.html');await page.waitForFunction(()=>window.qa);return page;};
+ let page=await open();
+ const ids=await page.evaluate(async()=>{const {db,queries:q}=window.qa;const shop=await q.createShop({name:'Persistence test'});const product=await q.createProduct({shop_id:shop.id,name:'Offline phone',quantity:3,price:1000});return {shop:shop.id,product:product.id};});
+ await context.close(); context=null;
+ page=await open();
+ await context.setOffline(true);
+ const result=await page.evaluate(async ids=>{const {db,queries:q}=window.qa;const p=await db.get('products').find(ids.product);if(p.name!=='Offline phone'||p.quantity!==3)throw Error('Product lost after restart');
+ const second=await q.createProduct({shop_id:ids.shop,name:'Clean phone',quantity:2,price:2000});
+ const batch=await q.getUnsyncedRecords(ids.shop,true,500,{products:[ids.product]});
+ if(batch.products.some(x=>x.id===ids.product)||!batch.products.some(x=>x.id===second.id))throw Error('Excluded row blocked clean row');
+ await db.write(async()=>{await db.get('sales').create(s=>{s.shopId=ids.shop;s.productId=ids.product;s.quantity=1;s.totalPrice=1000;s.date='2026-09-20T10:00:00Z';});});
+ const held=await q.getUnsyncedRecords(ids.shop,true,500,{products:[ids.product]});
+ if(held.sales.length)throw Error('Dependent sale escaped held product');
+ const snapshot=await q.getUnsyncedRecords(ids.shop,true,500);
+ await q.markAsSynced(snapshot,{products:[ids.product],sales:snapshot.sales.map(s=>s.id)},{products:{[second.id]:1}});
+ if(p._raw._status==='synced')throw Error('Rejected product acknowledged');
+ if(second._raw._status!=='synced')throw Error('Accepted product still pending');
+ return {second:second.id};},ids);
+ await context.close();context=null;
+ page=await open();
+ await page.evaluate(async ({ids,result})=>{const {db}=window.qa;const pending=await db.get('products').find(ids.product);const synced=await db.get('products').find(result.second);if(pending._raw._status==='synced'||synced._raw._status!=='synced')throw Error('Acknowledgements lost after restart');},{ids,result});
+ console.log('PASS: product survives full browser restart; offline creation; partial ack preserves rejected record; ack survives second restart.');
+}finally{await context?.close();await server.close();fs.unlinkSync(pageFile);fs.rmSync(profile,{recursive:true,force:true});}

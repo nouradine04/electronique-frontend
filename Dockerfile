@@ -15,6 +15,7 @@ ARG VITE_WINDOWS_DOWNLOAD_URL
 ARG VITE_LINUX_DOWNLOAD_URL
 
 COPY index.html vite.config.js jsconfig.json ./
+COPY scripts ./scripts
 COPY src ./src
 COPY public ./public
 RUN test -n "$VITE_BACKEND_URL" || (echo 'VITE_BACKEND_URL est obligatoire au build.' >&2; exit 1)

@@ -1,5 +1,7 @@
+import { trackingColumns, product_unitsSchema, unit_eventsSchema } from './schema.js';
 import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 import {
+  syncOperationSchema, syncOperationLinkSchema,
   localUserV3Schema,
   localUserAccountColumns,
   localUserPhoneColumns,
@@ -58,5 +60,7 @@ export default schemaMigrations({
         addColumns({ table: 'invoices', columns: syncVersionColumns }),
       ],
     },
+    { toVersion: 11, steps: [createTable(syncOperationSchema), createTable(syncOperationLinkSchema)] },
+    { toVersion: 12, steps: [addColumns({ table: "products", columns: trackingColumns }), createTable(product_unitsSchema), createTable(unit_eventsSchema)] },
   ],
 });

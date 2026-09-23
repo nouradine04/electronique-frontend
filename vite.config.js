@@ -1,3 +1,4 @@
+import { prepareOcrAssets } from './scripts/ocr-assets.mjs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -7,16 +8,24 @@ export default defineConfig({
     global: 'globalThis',
   },
   plugins: [
+    { name: 'local-ocr-assets', buildStart: prepareOcrAssets },
     VitePWA({
       manifest: false,
       injectRegister: 'script',
       registerType: 'prompt',
       workbox: {
+        importScripts: ['push-events.js'],
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        globIgnores: ['**/ocr/**'],
         navigateFallback: 'index.html',
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/ocr/v6/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'nstock-ocr-v6', cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 8, purgeOnQuotaError: true } },
+          },
           {
             urlPattern: ({ request }) => request.destination === 'image',
             handler: 'CacheFirst',
@@ -43,7 +52,7 @@ export default defineConfig({
       }
     })
   ],
-  base: './',
+  base: '/',
   server: {
     port: 3000,
     host: 'localhost'

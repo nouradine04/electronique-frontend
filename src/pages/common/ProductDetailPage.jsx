@@ -1,3 +1,4 @@
+import { UnitInventory } from '../../components/stock/UnitInventory';
 import React, { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -27,7 +28,7 @@ function movementLabel(movement) {
 }
 
 export function ProductDetailPage({ productId, onBack, onEdit }) {
-  const { userRole } = useShop();
+  const { userRole, userName } = useShop();
   const isOwner = userRole === 'owner';
   const reducedMotion = useReducedMotion();
   const [filterType, setFilterType] = useState('ALL');
@@ -79,10 +80,12 @@ export function ProductDetailPage({ productId, onBack, onEdit }) {
 
           <Tabs.Root defaultValue="information" className="pd-tabs">
             <Tabs.List className="pd-tabs-list" aria-label="Détails du produit">
+              {product.trackingMode !== 'QUANTITY' && <Tabs.Trigger value="units">Appareils</Tabs.Trigger>}
               <Tabs.Trigger value="information">Informations</Tabs.Trigger>
               <Tabs.Trigger value="movements">Mouvements <span>{movements.length}</span></Tabs.Trigger>
             </Tabs.List>
 
+            {product.trackingMode !== 'QUANTITY' && <Tabs.Content value="units"><UnitInventory product={product} userName={userName} /></Tabs.Content>}
             <Tabs.Content value="information" asChild>
               <motion.div className="pd-content" initial={reducedMotion ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}>
                 {product.description && <p className="pd-description">{product.description}</p>}

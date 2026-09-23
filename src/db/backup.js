@@ -1,8 +1,10 @@
 import database from './watermelondb.js';
+import { getBackupPassword } from '../services/backupCredential';
 import { deriveKey, encryptText, decryptText, decryptSync } from '../utils/crypto.js';
+import { imageAsDataUrl, isLocalMediaReference, saveLocalImage } from '../services/localMedia.js';
 
 export async function encodeLocalBackup(backup) {
-  const password = sessionStorage.getItem('encryption_pin');
+  const password = getBackupPassword();
   if (!password) throw new Error('Reconnectez-vous pour chiffrer la sauvegarde avec votre mot de passe.');
   const ciphertext = await encryptText(JSON.stringify(backup), await deriveKey(password));
   return JSON.stringify({ format: 'nstock-aes-gcm', ciphertext });
@@ -12,12 +14,12 @@ export async function decodeLocalBackup(text) {
   let envelope;
   try { envelope = JSON.parse(text); } catch { /* Legacy backup below. */ }
   if (envelope?.format === 'nstock-aes-gcm') {
-    const password = sessionStorage.getItem('encryption_pin');
+    const password = getBackupPassword();
     if (!password) throw new Error('Reconnectez-vous avec le mot de passe de la sauvegarde.');
     return JSON.parse(await decryptText(envelope.ciphertext, await deriveKey(password)));
   }
   try { return JSON.parse(decodeURIComponent(escape(atob(text)))); }
-  catch { return JSON.parse(decryptSync(text, sessionStorage.getItem('encryption_pin'))); }
+  catch { return JSON.parse(decryptSync(text, getBackupPassword())); }
 }
 
 export async function exportLocalBackup() {
@@ -28,7 +30,20 @@ export async function exportLocalBackup() {
     }
     return data;
   });
-  return { version: 2, timestamp: new Date().toISOString(), data };
+  const images = {};
+  for (const [table, field] of [['products', 'image_url'], ['shops', 'logo_url']]) {
+    for (const row of data[table] || []) {
+      const reference = row[field];
+      if (isLocalMediaReference(reference) && !images[reference]) {
+        try { images[reference] = await imageAsDataUrl(reference); }
+        catch (error) {
+          // A remote image can be downloaded later; an unsent photo cannot.
+          if (String(reference).startsWith('local-media://')) throw error;
+        }
+      }
+    }
+  }
+  return { version: 2, timestamp: new Date().toISOString(), data, images };
 }
 
 export async function restoreLocalBackup(backup) {
@@ -36,6 +51,15 @@ export async function restoreLocalBackup(backup) {
     throw new Error('Format de sauvegarde invalide.');
   }
   const data = { ...backup.data };
+  const restoredImages = new Map();
+  for (const [reference, value] of Object.entries(backup.images || {})) {
+    if (typeof value !== 'string' || !value.startsWith('data:image/')) throw new Error('Photo de sauvegarde invalide.');
+    const blob = await (await fetch(value)).blob();
+    restoredImages.set(reference, await saveLocalImage(blob));
+  }
+  for (const [table, field] of [['products', 'image_url'], ['shops', 'logo_url']]) {
+    for (const row of data[table] || []) if (restoredImages.has(row[field])) row[field] = restoredImages.get(row[field]);
+  }
   // Compatibilité avec les sauvegardes créées pendant la courte phase où les
   // images étaient séparées de WatermelonDB.
   if (Array.isArray(backup.media) && backup.media.length > 0) {

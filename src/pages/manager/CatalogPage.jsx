@@ -1,3 +1,4 @@
+import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useQuery } from '../../db/useQuery.js';
 import { useShop } from '../../context/ShopContext.jsx';
@@ -17,6 +18,7 @@ export function CatalogManagementPage() {
   const { t } = useTranslation();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [showAddWizard, setShowAddWizard] = useState(false);
@@ -54,23 +56,7 @@ export function CatalogManagementPage() {
         setEditingProduct(null);
         return;
       }
-      const initialQuantity = Number(productData.quantity || 0);
-      const product = await createProduct({
-        ...productData,
-        quantity: 0,
-        shop_id: currentShop.id,
-      });
-      if (initialQuantity > 0) {
-        await recordStockMovement({
-          shop_id: currentShop.id,
-          product_id: product.id,
-          product_name: product.name,
-          type: 'IN',
-          quantity: initialQuantity,
-          reason: 'Stock initial',
-          user_name: userName,
-        });
-      }
+      await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName });
       showToast('Produit ajouté avec succès', 'success');
       setShowAddWizard(false);
     } catch (err) {
@@ -94,7 +80,7 @@ export function CatalogManagementPage() {
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const q = (searchQuery || '').toLowerCase();
-      const nameMatch = (product.name || '').toLowerCase().includes(q) || (product.sku || '').toLowerCase().includes(q);
+      const nameMatch = unitMatches.has(product.id) || (product.name || '').toLowerCase().includes(q) || (product.sku || '').toLowerCase().includes(q);
       const catMatch = selectedCategory === 'ALL' || product.categoryId === selectedCategory;
       let statusMatch = true;
       if (statusFilter === 'IN_STOCK') statusMatch = product.quantity > 0 && product.status !== 'PENDING_PRICE';
@@ -102,7 +88,7 @@ export function CatalogManagementPage() {
       if (statusFilter === 'PENDING') statusMatch = product.status === 'PENDING_PRICE';
       return nameMatch && catMatch && statusMatch;
     });
-  }, [products, searchQuery, selectedCategory, statusFilter]);
+  }, [products, searchQuery, selectedCategory, statusFilter, unitMatches]);
   const pageSize = 10;
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);

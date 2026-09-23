@@ -1,16 +1,6 @@
+import { prepareReceivedUnits } from './productUnits';
+import { prepareOperation } from './operationQueue';
 import database from '../db/watermelondb.js';
-import { BACKEND_URL, LOCAL_ONLY } from '../context/backendConfig.js';
-
-export async function checkServerHealth() {
-  if (LOCAL_ONLY) return false;
-  try {
-    const res = await fetch(`${BACKEND_URL}/sync/pull?lastPulledAt=0`, { method: 'GET' });
-    return res.ok;
-  } catch (error) {
-    return false;
-  }
-}
-
 export async function recordStockMovement({
   shop_id,
   product_id,
@@ -22,6 +12,7 @@ export async function recordStockMovement({
   supplier_name,
   delivery_reference,
   unit_cost,
+  identifiers = '',
 }) {
   const productsCollection = database.get('products');
   quantity = Number(quantity);
@@ -37,7 +28,9 @@ export async function recordStockMovement({
       throw new Error('Produit introuvable.');
     }
 
-    newQuantity = Number(product.quantity || 0);
+    if (shop_id && product.shopId !== shop_id) throw new Error('Produit d’une autre boutique.');
+    const previousQuantity = Number(product.quantity || 0);
+    newQuantity = previousQuantity;
     if (type === 'IN') {
       newQuantity += Number(quantity);
     } else if (type === 'OUT') {
@@ -49,6 +42,9 @@ export async function recordStockMovement({
       newQuantity = Number(quantity);
     }
 
+    if (newQuantity === previousQuantity) return;
+    if (product.trackingMode !== 'QUANTITY' && type !== 'IN') throw new Error('Pour un appareil identifié, utilisez la vente ou le retour de l’unité concernée.');
+    const units = await prepareReceivedUnits(database, product, identifiers, quantity);
     const update = product.prepareUpdate(p => {
       p.quantity = newQuantity;
       if (type === 'IN' && Number(unit_cost) > 0) {
@@ -60,9 +56,9 @@ export async function recordStockMovement({
     const movement = database.get('stock_movements').prepareCreate(m => {
       m.shopId = shop_id || product.shopId;
       m.productId = product_id;
-      m.type = type;
-      m.quantity = quantity;
-      m.reason = reason || 'Mouvement manuel';
+      m.type = type === 'ADJUST' ? (newQuantity > previousQuantity ? 'IN' : 'OUT') : type;
+      m.quantity = type === 'ADJUST' ? Math.abs(newQuantity - previousQuantity) : quantity;
+      m.reason = reason || (type === 'ADJUST' ? 'Correction d’inventaire' : 'Mouvement manuel');
       m.userName = user_name || 'Opérateur';
       m.date = new Date().toISOString();
       m.supplierName = supplier_name || '';
@@ -70,7 +66,8 @@ export async function recordStockMovement({
       m.unitCost = unit_cost || 0;
       m.synced = false;
     });
-    await database.batch(update, movement);
+    const journal = await prepareOperation(database, product.shopId, [update, movement, ...units], { kind: 'stock', stock_before: previousQuantity });
+    await database.batch(update, movement, ...units, ...journal);
   });
 
   return newQuantity;

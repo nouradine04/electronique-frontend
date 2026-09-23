@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { isInstalledApp } from './services/appMode';
 import { useQueryState } from './db/useQuery.js';
 import { LoadingScreen } from './components/ui/LoadingScreen';
-import { queryProducts, querySales, queryCategories, queryStockMovements } from './db/queries.js';
+import { queryProducts, querySales } from './db/queries.js';
 import { ShopProvider, useShop } from './context/ShopContext.jsx';
 import { SyncProvider } from './context/SyncContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
@@ -29,13 +29,12 @@ import { TeamPage } from './pages/admin/TeamPage.jsx';
 import { ensurePersistentStorage } from './services/persistentStorage.js';
 import { closeDesktopVault, isTauriDesktop } from './services/desktopVault';
 import { stopDesktopBackup } from './services/desktopBackup';
+import { SessionNotice } from './components/auth/SessionNotice';
 
 function MainAppContent() {
   const { currentShop, userRole, isInitialized, hasValidLocalSession, logout } = useShop();
   const { records: products, loading: productsLoading } = useQueryState(queryProducts(currentShop?.id || ''));
   const { records: sales, loading: salesLoading } = useQueryState(querySales(currentShop?.id || ''));
-  const { records: categories, loading: categoriesLoading } = useQueryState(queryCategories(currentShop?.id || ''));
-  const { records: movements, loading: movementsLoading } = useQueryState(queryStockMovements(currentShop?.id || ''));
   // Le coffre SQLCipher exige une ouverture explicite après chaque redémarrage
   // de l'application desktop. La version web conserve son comportement actuel.
   const [isAuthenticated, setIsAuthenticated] = useState(() => !isTauriDesktop() && !!localStorage.getItem('userRole'));
@@ -47,7 +46,7 @@ function MainAppContent() {
   // Initialize active tab based on role on mount
   React.useEffect(() => {
     if (isAuthenticated) {
-      setActiveTab(userRole === 'manager' ? 'dashboard' : 'dashboard');
+      setActiveTab('dashboard');
     }
   }, [isAuthenticated, userRole]);
 
@@ -76,7 +75,7 @@ function MainAppContent() {
     // peut alors accorder la persistance selon ses propres heuristiques.
     void ensurePersistentStorage();
     setIsAuthenticated(true);
-    setActiveTab(role === 'manager' ? 'dashboard' : 'dashboard');
+    setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
@@ -89,7 +88,7 @@ function MainAppContent() {
     setIsAuthenticated(false);
   };
 
-  if (!isInitialized || (isAuthenticated && (!hasValidLocalSession || !currentShop || productsLoading || salesLoading || categoriesLoading || movementsLoading))) {
+  if (!isInitialized || (isAuthenticated && (!hasValidLocalSession || !currentShop || productsLoading || salesLoading))) {
     return (
       <LoadingScreen />
     );
@@ -134,6 +133,7 @@ function MainAppContent() {
   // Render App with Left Sidebar & Top Header layout matching ERP reference image
   return (
     <div className="app-container" style={{ display: 'flex', minHeight: '100dvh', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', position: 'relative' }}>
+      <SessionNotice reconnect={() => { setIsAuthenticated(false); setCurrentPage('login'); }} />
       
       {/* Mobile Overlay */}
       <div 

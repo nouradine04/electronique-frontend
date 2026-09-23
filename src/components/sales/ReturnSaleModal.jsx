@@ -1,3 +1,4 @@
+import { UnitPicker } from '../stock/UnitPicker';
 import React, { useEffect, useMemo, useState } from 'react';
 import { RotateCcw, X } from 'lucide-react';
 
@@ -17,6 +18,7 @@ const fieldStyle = {
 export function ReturnSaleModal({ sale, product, client, alreadyReturned = 0, onClose, onSubmit }) {
   const remaining = Math.max(0, Number(sale?.quantity || 0) - Number(alreadyReturned || 0));
   const unitPrice = Number(sale?.totalPrice || sale?.total_price || 0) / Math.max(1, Number(sale?.quantity || 1));
+  const [unitIds, setUnitIds] = useState([]);
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
   const [resolution, setResolution] = useState('REFUND');
@@ -46,6 +48,7 @@ export function ReturnSaleModal({ sale, product, client, alreadyReturned = 0, on
       try {
         await onSubmit({
           quantity: Number(quantity),
+          unit_ids: unitIds,
           reason: reason.trim(),
           resolution,
           restock,
@@ -94,6 +97,8 @@ export function ReturnSaleModal({ sale, product, client, alreadyReturned = 0, on
             Quantité retournée
             <input style={fieldStyle} type="number" min="1" max={remaining} step="1" value={quantity} onChange={event => setQuantity(event.target.value)} required />
           </label>
+
+          {product.trackingMode !== 'QUANTITY' && <UnitPicker productId={product.id} saleId={sale.id} quantity={Number(quantity)} selected={unitIds} onChange={setUnitIds} />}
 
           <label style={{ display: 'grid', gap: '7px', fontSize: '13px', fontWeight: 700 }}>
             Motif du retour

@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { disableWebPush } from '../services/webPush';
+import { logoutSession } from '../services/session';
+import { setBackupPassword } from '../services/backupCredential';
 import { useQuery } from '../db/useQuery.js';
 import { queryAllShops, createShop, database } from '../db/queries.js';
 import { getPlanLimits, removeLegacyDemoUsers } from '../services/localAuth.js';
@@ -11,6 +14,7 @@ export function ShopProvider({ children }) {
   const [userName, setUserName] = useState(() => localStorage.getItem('userName') || 'Utilisateur');
   const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem('currentUserId') || '');
   const [hasValidLocalSession, setHasValidLocalSession] = useState(false);
+  const [initError, setInitError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Requête réactive sur toutes les boutiques (mise à jour automatique)
@@ -21,7 +25,6 @@ export function ShopProvider({ children }) {
 
   useEffect(() => {
     async function init() {
-      await removeLegacyDemoUsers();
       const storedShops = await queryAllShops().fetch();
       const storedShopId = localStorage.getItem('currentShopId');
       const storedUserId = localStorage.getItem('currentUserId');
@@ -47,7 +50,7 @@ export function ShopProvider({ children }) {
       }
       setIsInitialized(true);
     }
-    init();
+    void init().catch(setInitError);
   }, []);
 
   // Sélection automatique de la boutique quand les données sont chargées
@@ -113,6 +116,8 @@ export function ShopProvider({ children }) {
   };
 
   const logout = () => {
+    void disableWebPush().catch(() => {});
+    void logoutSession().catch(() => {});
     localStorage.removeItem('userRole');
     localStorage.removeItem('userName');
     localStorage.removeItem('authToken');
@@ -120,11 +125,14 @@ export function ShopProvider({ children }) {
     localStorage.removeItem('currentUserId');
     localStorage.removeItem('currentShopId');
     sessionStorage.removeItem('encryption_pin');
+    setBackupPassword('');
     setUserRole('manager');
     setUserName('Utilisateur');
     setCurrentUserId('');
     setHasValidLocalSession(false);
   };
+
+  if (initError) throw initError;
 
   return (
     <ShopContext.Provider value={{

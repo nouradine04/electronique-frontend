@@ -2,7 +2,7 @@ import database from '../db/watermelondb';
 import { getDesktopVaultSnapshot, isTauriDesktop, upsertDesktopRecord } from './desktopVault';
 
 const TABLES = [
-  'local_users', 'shops', 'categories', 'products', 'sales', 'returns',
+  'product_units', 'unit_events', 'sync_operations', 'sync_operation_links', 'local_users', 'shops', 'categories', 'products', 'sales', 'returns',
   'expenses', 'payments', 'clients', 'stock_movements', 'invoices',
 ] as const;
 
@@ -112,6 +112,6 @@ export async function restoreWatermelonFromDesktop() {
       restored += 1;
     }
     if (creates.length) await database.batch(...creates);
-  });
+  }, 'session-restore');
   return restored;
 }

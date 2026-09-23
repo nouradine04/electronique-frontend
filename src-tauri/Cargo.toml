@@ -22,3 +22,4 @@ sha2 = "0.10"
 tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 zeroize = "1"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }

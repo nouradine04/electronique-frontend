@@ -1,3 +1,4 @@
+import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '../../db/useQuery.js';
@@ -18,6 +19,7 @@ export function AdminStockPage() {
   const { currentShop, userName } = useShop();
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedProductForPrice, setSelectedProductForPrice] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -34,7 +36,7 @@ export function AdminStockPage() {
     const q = String(searchQuery || '').toLowerCase();
     const nameStr = String(p.name || '').toLowerCase();
     const catStr = String(categories.find(category => category.id === p.categoryId)?.name || '').toLowerCase();
-    const matchesSearch = nameStr.includes(q) || catStr.includes(q);
+    const matchesSearch = unitMatches.has(p.id) || nameStr.includes(q) || catStr.includes(q);
     const matchesCategory = selectedCategory === 'ALL' || p.categoryId === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -46,24 +48,7 @@ export function AdminStockPage() {
 
   const handleAddProduct = async (productData) => {
     try {
-      const initialQuantity = Number(productData.quantity || 0);
-      const product = await createProduct({
-        ...productData,
-        status: 'ACTIVE',
-        quantity: 0,
-        shop_id: currentShop.id,
-      });
-      if (initialQuantity > 0) {
-        await recordStockMovement({
-          shop_id: currentShop.id,
-          product_id: product.id,
-          product_name: product.name,
-          type: 'IN',
-          quantity: initialQuantity,
-          reason: 'Stock initial',
-          user_name: userName,
-        });
-      }
+      await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName , status: 'ACTIVE' });
       setShowAddProduct(false);
       showToast('Produit ajouté et disponible à la vente.', 'success');
     } catch (error) {

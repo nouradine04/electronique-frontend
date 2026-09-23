@@ -39,7 +39,7 @@ export function GoogleSignInButton({ onVerified, onError }: { onVerified: (profi
             const response = await fetch(`${BACKEND_URL}/auth/google/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential }) });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(payload.message || 'Connexion Google impossible.');
-            await verified.current(payload);
+            await verified.current({ ...payload, credential });
           } catch (error) { reportError.current(error instanceof Error ? error.message : 'Connexion Google impossible.'); }
         },
       });

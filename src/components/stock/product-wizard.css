@@ -59,3 +59,8 @@
   .form-progress li:not(:last-child)::after { top: 20px; left: calc(50% + 25px); width: calc(100% - 50px); }
 }
 @media (prefers-reduced-motion: reduce) { .wizard-card input, .wizard-card select, .wizard-card textarea { transition: none; } }
+
+.wizard-card .catalog-manual-link { display: inline-flex; align-items: center; gap: 6px; text-align: left; min-height: 32px; }
+@media (min-width: 360px) and (max-width: 600px) {
+  .wizard-field-grid.wizard-variant-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+}

@@ -12,6 +12,12 @@ import { LOCAL_ONLY } from './backendConfig';
 import { useShop } from './ShopContext.jsx';
 import { pullChanges, pushChanges } from '../services/syncService';
 import { applyRemoteChanges } from '../services/applyRemoteChanges.js';
+import { shouldSync, jitteredRetryDelay, reconnectDelay } from '../services/syncPolicy.js';
+import { prepareBatchMedia } from '../services/syncMedia.js';
+import { snapshotBatch } from '../services/syncSnapshot';
+import { pushPendingOperations, pendingOperationCount } from '../services/syncOperations';
+import { readSyncConflicts, saveSyncConflicts, clearSyncConflicts } from '../services/syncConflicts';
+import { canWorkOffline, ensureAccessToken, getSession } from '../services/session';
 
 const SyncContext = createContext();
 
@@ -58,9 +64,11 @@ export function SyncProvider({ children }) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [syncError, setSyncError] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const retryTimer = useRef(null);
   const syncLock = useRef(false);
+  const syncSchedule = useRef({ key: '', lastSuccess: 0, retryAt: 0, failures: 0 });
 
   // Mise à jour du compteur de pending en temps réel
   const refreshPendingCount = useCallback(async () => {
@@ -75,7 +83,9 @@ export function SyncProvider({ children }) {
     }
   }, [currentShop, userRole]);
 
-  const buildChangesPayload = useCallback((unsynced) => finalizePayloadStates({
+  const buildChangesPayload = useCallback((batch) => {
+    const unsynced = snapshotBatch(batch);
+    return finalizePayloadStates({
     users: {
       created: unsynced.users.map(user => ({
         id: user.id,
@@ -99,7 +109,7 @@ export function SyncProvider({ children }) {
         phone: s.phone,
         nif: s.nif,
         email: s.email,
-        logo_url: s.logoUrl,
+        logo_url: cloudImage(s.logoUrl),
       })),
       updated: [],
       deleted: [],
@@ -115,6 +125,7 @@ export function SyncProvider({ children }) {
     },
     products: {
       created: unsynced.products.map(p => ({
+        tracking_mode: p.trackingMode,
         id: p.id,
         shop_id: p.shopId,
         category_id: p.categoryId,
@@ -256,25 +267,41 @@ export function SyncProvider({ children }) {
       updated: [],
       deleted: [],
     },
-  }, unsynced), []);
+  }, unsynced); }, []);
 
   // Sync principale : push local → NestJS, pull NestJS → local
-  const syncWithBackend = useCallback(async () => {
+  const syncWithBackend = useCallback(async (force = false) => {
     if (LOCAL_ONLY || !navigator.onLine || syncLock.current || !currentShop) return;
+    if (!canWorkOffline()) return;
+    if (getSession()?.userId !== localStorage.getItem('currentUserId')) return;
 
     syncLock.current = true;
-    setIsSyncing(true);
     try {
       const tenantId = currentShop.accountId || currentShop.id;
       const cursorKey = `lastPulledAt:${tenantId}:${currentShop.id}`;
+      if (syncSchedule.current.key !== cursorKey) {
+        syncSchedule.current = { key: cursorKey, lastSuccess: 0, retryAt: syncSchedule.current.retryAt, failures: 0 };
+      }
+      const schedule = syncSchedule.current;
+      if (force === true) clearSyncConflicts(cursorKey);
+      let excluded = readSyncConflicts(cursorKey);
+      const pending = (await getUnsyncedRecords(currentShop.id, userRole === 'owner', 1, excluded)).total + await pendingOperationCount(currentShop.id);
+      if (!shouldSync({ ...schedule, pending, now: Date.now(), force: force === true, visible: document.visibilityState !== 'hidden' })) return;
+      setIsSyncing(true);
+      await ensureAccessToken();
       const storedPullTimestamp = Number(localStorage.getItem(cursorKey) || 0);
+      const operationState = await pushPendingOperations(currentShop.id, force === true);
       for (let batchIndex = 0; batchIndex < MAX_PUSH_BATCHES_PER_RUN; batchIndex += 1) {
-        const batch = await getUnsyncedRecords(
+        let batch = await getUnsyncedRecords(
           currentShop.id,
           userRole === 'owner',
           SYNC_BATCH_SIZE,
+          excluded,
         );
         if (batch.total === 0) break;
+        if (await prepareBatchMedia(batch, currentShop.id)) {
+          batch = await getUnsyncedRecords(currentShop.id, userRole === 'owner', SYNC_BATCH_SIZE, excluded);
+        }
 
         const response = await pushChanges({
           changes: buildChangesPayload(batch),
@@ -289,8 +316,8 @@ export function SyncProvider({ children }) {
         const rejectedIds = response.rejected_ids || {};
         const rejectedCount = Object.values(rejectedIds)
           .reduce((total, ids) => total + ids.length, 0);
-        await markAsSynced(batch, rejectedIds);
-        if (rejectedCount > 0) break;
+        await markAsSynced(batch, rejectedIds, response.versions);
+        if (rejectedCount > 0) excluded = saveSyncConflicts(cursorKey, excluded, rejectedIds);
       }
 
       let pullCursor = null;
@@ -312,9 +339,19 @@ export function SyncProvider({ children }) {
       }
 
       setLastSyncedAt(new Date());
+      const held = Object.values(excluded).reduce((count, ids) => count + ids.length, 0);
+      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) en attente de correction. Les données sont conservées.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : '');
+      schedule.lastSuccess = Date.now();
+      schedule.failures = 0;
+      schedule.retryAt = 0;
       await refreshPendingCount();
 
     } catch (err) {
+      if (err.status === 409) {
+        setSyncError(err.message);
+      }
+      syncSchedule.current.failures += 1;
+      syncSchedule.current.retryAt = Date.now() + jitteredRetryDelay(syncSchedule.current.failures);
       console.warn('[Sync] Échec — données conservées localement:', err.message);
     } finally {
       syncLock.current = false;
@@ -322,11 +359,26 @@ export function SyncProvider({ children }) {
     }
   }, [buildChangesPayload, currentShop, refreshPendingCount, userRole]);
 
+  // Group rapid local writes into one push; never poll the server per keystroke.
+  useEffect(() => {
+    let timer;
+    const onWrite = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { void refreshPendingCount(); void syncWithBackend(); }, 750);
+    };
+    window.addEventListener('nstock:local-write', onWrite);
+    return () => { clearTimeout(timer); window.removeEventListener('nstock:local-write', onWrite); };
+  }, [refreshPendingCount, syncWithBackend]);
+
   // Écoute online/offline
   useEffect(() => {
+    let reconnectTimer;
     const handleOnline = () => {
       setIsOnline(true);
-      syncWithBackend();
+      const delay = reconnectDelay();
+      syncSchedule.current.retryAt = Math.max(syncSchedule.current.retryAt, Date.now() + delay);
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => syncWithBackend(), delay + 10);
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -336,6 +388,7 @@ export function SyncProvider({ children }) {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
+      clearTimeout(reconnectTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -354,7 +407,9 @@ export function SyncProvider({ children }) {
   // Synchronisation immédiate à l'ouverture d'une boutique. Les retries et
   // l'événement `online` prennent ensuite le relais sans demander à l'utilisateur.
   useEffect(() => {
-    if (!LOCAL_ONLY && isOnline && currentShop) void syncWithBackend();
+    if (LOCAL_ONLY || !isOnline || !currentShop) return;
+    const timer = setTimeout(() => syncWithBackend(), reconnectDelay());
+    return () => clearTimeout(timer);
   }, [currentShop, isOnline, syncWithBackend]);
 
   // Re-sync au focus de l'onglet
@@ -373,7 +428,7 @@ export function SyncProvider({ children }) {
   }, [refreshPendingCount]);
 
   const triggerManualSync = useCallback(() => {
-    if (isOnline) syncWithBackend();
+    if (isOnline) syncWithBackend(true);
   }, [isOnline, syncWithBackend]);
 
   return (
@@ -382,6 +437,7 @@ export function SyncProvider({ children }) {
       isLocalOnly: LOCAL_ONLY,
       isSyncing,
       pendingCount,
+      syncError,
       lastSyncedAt,
       triggerManualSync
     }}>

@@ -1,3 +1,4 @@
+import { ProductUnit, UnitEvent } from './models/ProductUnit';
 /**
  * WatermelonDB — Base de données locale offline-first
  *
@@ -11,6 +12,7 @@ import RawLokiJSAdapter from '@nozbe/watermelondb/adapters/lokijs';
 
 import schema from './schema';
 import migrations from './migrations.js';
+import { SyncOperation, SyncOperationLink } from './models/SyncOperation';
 import LocalUser from './models/LocalUser.js';
 import Shop from './models/Shop';
 import Category from './models/Category';
@@ -23,6 +25,7 @@ import Invoice from './models/Invoice';
 import ReturnRecord from './models/ReturnRecord';
 import Expense from './models/Expense';
 import { installLocalIdGenerator } from './localId';
+import { assertSessionWritable } from '../services/session';
 
 installLocalIdGenerator();
 
@@ -58,6 +61,7 @@ const adapter = new LokiJSAdapter({
 export const database = new Database({
   adapter,
   modelClasses: [
+    SyncOperation, SyncOperationLink, ProductUnit, UnitEvent,
     LocalUser,
     Shop,
     Category,
@@ -72,6 +76,21 @@ export const database = new Database({
   ],
 });
 
+let mutationRevision = 0;
+database.experimentalSubscribe(Object.keys(schema.tables), () => { mutationRevision += 1; });
+const write = database.write.bind(database);
+database.write = (work, description) => write(async writer => {
+  if (description !== 'session-restore') assertSessionWritable();
+  const revision = mutationRevision;
+  const result = await work(writer);
+  // Do not report a successful write while it exists only in Loki memory.
+  if (mutationRevision !== revision) {
+    if (!isTauriRuntime) await flushLocalDatabase();
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('nstock:local-write'));
+  }
+  return result;
+}, description);
+
 /** Force l'écriture IndexedDB après une opération critique comme l'inscription. */
 let saveQueue = Promise.resolve();
 
@@ -85,21 +104,6 @@ export function flushLocalDatabase() {
   });
   saveQueue = saveQueue.catch(() => undefined).then(save);
   return saveQueue;
-}
-
-// L'autosave Loki est conservé, mais chaque mutation déclenche aussi une
-// sauvegarde sérialisée immédiate. Une fermeture juste après une vente ou une
-// inscription ne doit pas attendre l'intervalle d'autosave.
-if (!isTauriRuntime) {
-  const durableTables = [
-    'local_users', 'shops', 'categories', 'products', 'sales', 'returns',
-    'expenses', 'payments', 'clients', 'stock_movements', 'invoices',
-  ];
-  database.experimentalSubscribe(durableTables, () => {
-    void flushLocalDatabase().catch(error => {
-      console.error('[Stockage local] Écriture immédiate impossible.', error);
-    });
-  });
 }
 
 // L'adaptateur IndexedDB incrémental charge les collections à la demande. Après

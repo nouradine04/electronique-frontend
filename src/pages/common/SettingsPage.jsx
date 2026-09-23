@@ -11,6 +11,7 @@ import { saveLocalImage } from '../../services/localMedia.js';
 import { updateLocalUserProfile } from '../../services/localAuth.js';
 import { FormField, FormInput } from '../../components/ui/FormControls';
 import './settings.css';
+import { PushSettings } from '../../components/PushSettings';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -253,6 +254,7 @@ export function SettingsPage() {
       </div>
 
       {/* Backup and Restore Panel */}
+      {userRole === 'owner' && <PushSettings />}
       <div style={{ backgroundColor: 'var(--bg-surface)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '12px', color: 'var(--text-primary)' }}>
           Sécurité & Sauvegarde d'urgence

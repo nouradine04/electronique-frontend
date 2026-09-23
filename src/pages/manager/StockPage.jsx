@@ -1,3 +1,4 @@
+import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, queryStockMovements, updateProduct, createProduct } from '../../db/queries.js';
@@ -24,6 +25,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
   const { showToast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'LOW' | 'OUT'
   const [activeView, setActiveView] = useState('inventory');
@@ -52,7 +54,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
     const skuStr = String(product.sku || '').toLowerCase();
     const locStr = String(product.location || '').toLowerCase();
     
-    const matchesSearch = nameStr.includes(q) || skuStr.includes(q) || locStr.includes(q);
+    const matchesSearch = unitMatches.has(product.id) || nameStr.includes(q) || skuStr.includes(q) || locStr.includes(q);
 
     const matchesCategory = selectedCategory === 'ALL' || product.category_id === selectedCategory;
 
@@ -122,23 +124,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
         }
         showToast('Composant mis à jour.', 'success');
       } else {
-        const initialQuantity = Number(productData.quantity || 0);
-        const createdProduct = await createProduct({
-          ...productData,
-          quantity: 0,
-          shop_id: currentShop.id,
-        });
-        if (initialQuantity > 0) {
-          await recordStockMovement({
-            shop_id: currentShop.id,
-            product_id: createdProduct.id,
-            product_name: createdProduct.name,
-            type: 'IN',
-            quantity: initialQuantity,
-            reason: 'Stock initial',
-            user_name: userName,
-          });
-        }
+        await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName });
         showToast('Nouveau composant ajouté.', 'success');
       }
       setProductFormModal({ open: false, product: null });

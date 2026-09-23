@@ -26,6 +26,6 @@ export function pushChanges(params: { changes: SyncChanges; lastPulledAt: number
 
   return requestJson<PushChangesResponse>(`/sync/push?${search.toString()}`, {
     method: 'POST',
-    body: JSON.stringify({ changes: params.changes }),
+    body: JSON.stringify({ changes: params.changes, acknowledgement: 'records-v1' }),
   });
 }
