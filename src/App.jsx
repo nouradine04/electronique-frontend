@@ -1,3 +1,4 @@
+import { AutomaticAppUpdates } from './components/AutomaticAppUpdates';
 import React, { useState } from 'react';
 import { isInstalledApp } from './services/appMode';
 import { useQueryState } from './db/useQuery.js';
@@ -244,6 +245,7 @@ export default function App() {
 
   return (
       <ToastProvider>
+        <AutomaticAppUpdates />
         <ShopProvider>
           <SyncProvider>
             <MainAppContent />

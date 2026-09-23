@@ -24,7 +24,7 @@ function setup() {
   }};
   vm.runInNewContext(ts.transpileModule(source,{fileName:'useLandingPage.jsx',compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);
   const render=()=>{cursor=0;return context.exports.useLandingPage({onLoginSuccess:()=>events.push('success')});};
-  const form=render();form.setShopName('Shop');form.setAdminName('Owner');form.setEmail('owner@example.com');form.setPassword('Test-password!');
+  const form=render();form.setShopName('Shop');form.setAdminName('Owner');form.setEmail('owner@example.com');form.setPassword('Test-password!');form.setRegisterStep(2);
   return {render,events,context,resolveServer,rejectServer};
 }
 test('registration never writes local account or enters app before server acknowledgement',async()=>{
@@ -42,4 +42,10 @@ test('offline registration creates nothing',async()=>{
   const s=setup();s.context.navigator.onLine=false;
   await s.render().handleRegister({preventDefault(){}});
   assert.deepEqual(s.events,[]);assert.match(s.render().error,/Internet requis/);
+});
+
+test('mobile trailing email space is accepted and Enter on step one only advances the form',async()=>{
+ const s=setup();const form=s.render();form.setEmail('owner@example.com ');form.setRegisterStep(1);
+ await s.render().handleRegister({preventDefault(){}});
+ assert.equal(s.render().registerStep,2);assert.equal(s.render().error,'');assert.deepEqual(s.events,[]);
 });

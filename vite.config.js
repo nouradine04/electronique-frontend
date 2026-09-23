@@ -12,8 +12,10 @@ export default defineConfig({
     VitePWA({
       manifest: false,
       injectRegister: 'script',
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         importScripts: ['push-events.js'],
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         globIgnores: ['**/ocr/**'],

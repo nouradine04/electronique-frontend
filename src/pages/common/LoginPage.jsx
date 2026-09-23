@@ -1,3 +1,4 @@
+import { BACKEND_URL } from '../../context/backendConfig';
 import { AppErrorPage } from '../../components/errors/AppErrorPage';
 import { Reveal } from '../../components/Reveal';
 import React, { useState } from 'react';
@@ -54,7 +55,7 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
     } catch (err) {
       if (err instanceof NetworkError) setConnectionError(true);
       if (isTauriDesktop()) void closeDesktopVault();
-      setError(`${err.message || 'Erreur lors de la connexion'} (Serveur: ${import.meta.env.VITE_BACKEND_URL || 'local'})`);
+      setError(`${err.message || 'Erreur lors de la connexion'} (Serveur: ${BACKEND_URL})`);
       setLoading(false);
     }
   };

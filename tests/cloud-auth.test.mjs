@@ -20,10 +20,10 @@ function setup() {
 }
 test('new device authenticates remotely even when business sync is disabled', async () => {
   const s = setup();
-  assert.equal(await s.api.loginCloudAccount(' User@Example.COM ', 'Exact Password!'), s.session);
+  assert.equal(await s.api.loginCloudAccount(' User@Example.COM ', ' Exact Password! '), s.session);
   assert.equal(s.calls[0].path, '/auth/login');
   assert.equal(s.calls[0].body.email, 'user@example.com');
-  assert.equal(s.calls[0].body.password, 'Exact Password!');
+  assert.equal(s.calls[0].body.password, ' Exact Password! ');
   assert.equal(s.accepted.length, 1);
 });
 test('server refusal does not create a local authenticated session', async () => {
@@ -37,7 +37,7 @@ test('offline cloud login does not send requests or create sessions', async () =
   assert.equal(s.calls.length,0); assert.equal(s.accepted.length,0);
 });
 
-const registration = {shop_name:'Shop',name:'Owner',email:' Owner@Example.com ',password:'Exact Password!'};
+const registration = {shop_name:'Shop',name:'Owner',email:' Owner@Example.com ',password:' Exact Password! '};
 test('registration requires network and never accepts a session on server failure', async () => {
   const s=setup(); s.context.navigator.onLine=false;
   await assert.rejects(s.api.registerCloudAccount(registration));

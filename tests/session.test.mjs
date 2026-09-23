@@ -66,3 +66,11 @@ test('existing session resumes offline; access expiry does not close it; logout 
   await assert.rejects(s.api.logoutSession());
   assert.equal(s.api.hasStoredSessionFor('u1'),false);
 });
+
+test('old browser API override cannot redirect authentication to a different backend', async () => {
+  const s=setup();let url;
+  s.storage.set('backend_url','https://old-server.example');
+  s.context.fetch=async value=>{url=value;return {ok:true,json:async()=>({})};};
+  await s.api.sessionRequest('/auth/login',{email:'user@example.com',password:'test'});
+  assert.equal(url,'https://api.medaaris.com/auth/login');
+});

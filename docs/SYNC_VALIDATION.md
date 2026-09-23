@@ -124,3 +124,19 @@ Le formulaire de connexion ne vérifie plus les mots de passe dans WatermelonDB 
 Une session web déjà ouverte peut être reprise avec son utilisateur local et sa référence de session serveur correspondant à la même API. L’expiration du token d’accès de 15 minutes ne bloque pas le travail hors ligne ; l’échéance hors ligne bloque les écritures sans supprimer les données. La déconnexion supprime la référence de session. Tauri conserve l’ouverture explicite du coffre au redémarrage : cette modification ne fournit pas de déverrouillage automatique du coffre hors ligne.
 
 Tests `test:auth` : 14 scénarios réussis, dont formulaire hors ligne, serveur injoignable sans repli local, connexion réussie, maintien d’une session existante, lecture seule à expiration et déconnexion.
+
+### Diagnostic d’authentification production : version et destination
+
+Le bundle public inspecté le 23 septembre (`index-KHrk5HTs.js`) attend bien `/auth/register` avant toute restauration locale. Il utilisait encore la surcharge `localStorage.backend_url`, désormais supprimée des trois clients HTTP : seule l’API configurée au build est utilisée. Les anciennes références de session restent associées à leur API et ne sont pas transférées automatiquement.
+
+Le formulaire accepte un email avec espaces périphériques, désactive la correction mobile et fait avancer l’étape 1 lors d’Entrée. Le mot de passe est transmis sans transformation. Le backend distingue les champs invalides et retourne 409 pour une nouvelle inscription sur un email existant, sans tenter une connexion implicite.
+
+Un avis de mise à jour permet d’activer un service worker en attente après sauvegarde des saisies, sans effacer la base locale. Pour un appareil encore bloqué sur une version antérieure à cet avis, fermer toutes les fenêtres de l’app et du site puis rouvrir ; ne pas effacer le stockage.
+
+Validation : 16 tests frontend d’authentification et 4 backend réussis. La cause exacte du compte absent dans la base interrogée reste à confirmer en comparant l’hôte/la base dans DATABASE_URL du backend en production et la ressource PostgreSQL inspectée. Aucun compte de production n’a été créé ou modifié pendant ces vérifications.
+
+### Mise à jour automatique, sans bouton
+
+À la demande de l’utilisateur, le bouton de mise à jour est supprimé. Workbox active les nouvelles versions automatiquement (`skipWaiting`, `clientsClaim`). Une vérification est effectuée à l’ouverture et au retour du réseau, sans polling supplémentaire et sans rechargement forcé du formulaire en cours. Le prochain chargement utilise la nouvelle version. Cela ne remplace pas la synchronisation métier automatique, qui reste dans SyncContext.
+
+Configuration serveur communiquée : PostgreSQL activé, hôte `y10nuuk4qr7jhxwrjput14iw`, port 5432, base `postgres`. Le compte absent en production reste à diagnostiquer ; ces changements de mise à jour ne le récupèrent pas.

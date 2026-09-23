@@ -69,7 +69,7 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
   };
 
   const goToCredentials = () => {
-    if (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email)) {
+    if (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
       setError('Indiquez votre nom et une adresse email valide.');
       return;
     }
@@ -79,6 +79,12 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    if (registerStep === 1) { goToCredentials(); return; }
+    if (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setRegisterStep(1);
+      setError('Vérifiez votre nom et votre email.');
+      return;
+    }
     setLoading(true);
     setError('');
 
@@ -92,8 +98,8 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       setLoading(false);
       return;
     }
-    if (password.trim().length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères (sans espaces).');
+    if (password.length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caractères.');
       setLoading(false);
       return;
     }

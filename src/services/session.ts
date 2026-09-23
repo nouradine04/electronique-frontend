@@ -9,7 +9,7 @@ let accessToken = '';
 let refreshing: Promise<string> | null = null;
 const KEY = 'nstock_session';
 const native = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-const base = () => (localStorage.getItem('backend_url') || BACKEND_URL).replace(/\/+$/, '');
+const base = () => BACKEND_URL.replace(/\/+$/, '');
 const notify = () => window.dispatchEvent(new Event('nstock-session'));
 export function getSession(): SessionState | null {
   try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; }

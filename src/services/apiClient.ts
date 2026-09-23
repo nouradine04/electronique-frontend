@@ -2,7 +2,7 @@ import { BACKEND_URL } from '../context/backendConfig';
 import { ApiError, NetworkError, ensureAccessToken, getAccessToken, invalidateAccessToken } from './session';
 
 export function apiUrl(endpoint = '') {
-  const baseUrl = localStorage.getItem('backend_url') || BACKEND_URL;
+  const baseUrl = BACKEND_URL;
   const normalizedBase = baseUrl.replace(/\/+$/, '');
   const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${normalizedBase}${normalizedEndpoint}`;

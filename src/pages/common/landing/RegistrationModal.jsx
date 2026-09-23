@@ -65,7 +65,7 @@ export function RegistrationModal({
             </div>
 
             {error && !(
-              (registerStep === 1 && (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email)))
+              (registerStep === 1 && (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())))
               || (registerStep === 2 && (!shopName.trim() || password.length < 8))
             ) && (
               <div style={{
@@ -92,8 +92,8 @@ export function RegistrationModal({
                   <FormField id="register-name" label="Votre nom" error={error && !adminName.trim() ? 'Indiquez votre nom.' : null}>
                     <FormInput id="register-name" leadingIcon={<User size={18} />} type="text" autoComplete="name" placeholder="Votre nom" value={adminName} onChange={(e) => { setAdminName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !adminName.trim())} autoFocus />
                   </FormField>
-                  <FormField id="register-email" label="Email" error={error && !/^\S+@\S+\.\S+$/.test(email) ? 'Adresse email invalide.' : null}>
-                    <FormInput id="register-email" leadingIcon={<Mail size={18} />} type="email" inputMode="email" autoComplete="email" placeholder="Votre email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} aria-invalid={Boolean(error && !/^\S+@\S+\.\S+$/.test(email))} />
+                  <FormField id="register-email" label="Email" error={error && !/^\S+@\S+\.\S+$/.test(email.trim()) ? 'Adresse email invalide.' : null}>
+                    <FormInput id="register-email" leadingIcon={<Mail size={18} />} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Votre email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} aria-invalid={Boolean(error && !/^\S+@\S+\.\S+$/.test(email.trim()))} />
                   </FormField>
                   <div className="form-actions"><button type="button" className="btn btn-primary" onClick={goToCredentials}>Continuer <ArrowRight size={17} /></button></div>
                 </> : <>
