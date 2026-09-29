@@ -10,8 +10,11 @@ import { markLocalChangesAsSynced } from '@nozbe/watermelondb/sync/impl';
 import { protectedEntityIds, prepareOperation } from '../services/operationQueue';
 import { syncDependencies } from '../services/syncConflicts';
 import { acknowledgeVersions } from '../services/acknowledgeVersions';
+import { deletedIdsForShop, forgetDeletedShop, markRecordDeleted } from './deletionScope';
 import database from './watermelondb';
 export { database };
+// Toute future suppression métier WatermelonDB doit passer par cette fonction.
+export const markLocalRecordDeleted = record => markRecordDeleted(database, record);
 
 // ─── Collections ─────────────────────────────────────────────────────────────
 export const shops = database.get('shops');
@@ -523,7 +526,9 @@ export const getUnsyncedRecords = async (shopId, includeUsers = true, limit = 50
 
     // Les lignes supprimées ne sont plus interrogeables comme des modèles,
     // mais l'adaptateur conserve leurs identifiants jusqu'à l'accusé serveur.
-    const tombstones = remaining > 0 ? await database.adapter.getDeletedRecords(snapshotTable) : [];
+    const tombstones = remaining > 0
+      ? await deletedIdsForShop(database.adapter, snapshotTable, await database.adapter.getDeletedRecords(snapshotTable), shopId)
+      : [];
     const protectedDeleted = await protectedEntityIds(database, snapshotTable, tombstones);
     const deleted = tombstones.filter(id => !excluded[config.table]?.includes(id) && !protectedDeleted.has(id)).slice(0, remaining);
     remaining -= deleted.length;
@@ -553,7 +558,8 @@ export const getUnsyncedCount = async (shopId, includeUsers = true, excluded = {
       config.collection.query(Q.where(statusColumn, 'updated'), ...scope).fetchCount(),
       database.adapter.getDeletedRecords(snapshotTable),
     ]);
-    return created + updated + deleted.filter(id => !excluded[config.table]?.includes(id)).length;
+    const ownedDeleted = await deletedIdsForShop(database.adapter, snapshotTable, deleted, shopId);
+    return created + updated + ownedDeleted.filter(id => !excluded[config.table]?.includes(id)).length;
   }));
   return counts.reduce((total, count) => total + count, 0);
 };
@@ -575,4 +581,8 @@ export const markAsSynced = async (batch, rejectedIds = {}, versions = {}) => {
     }
   }
   await markLocalChangesAsSynced(database, batch.syncSnapshot, localRejectedIds);
+  for (const [table, changes] of Object.entries(batch.syncSnapshot.changes)) {
+    const rejected = new Set(localRejectedIds[table] || []);
+    await forgetDeletedShop(database.adapter, table, changes.deleted.filter(id => !rejected.has(id)));
+  }
 };

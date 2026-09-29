@@ -26,8 +26,8 @@ function setup({online=true,failure=false}={}) {
   const find=node=>{if(!node)return;if(Array.isArray(node)){for(const child of node){const result=find(child);if(result)return result;}}else if(node.type==='form')return node;else return find(node.props?.children);};
   return {events,submit:()=>find(tree).props.onSubmit({preventDefault(){}})};
 }
-test('new login offline refuses even with an existing local account and session',async()=>{
- const s=setup({online:false});await s.submit();assert.deepEqual(s.events,[]);
+test('false offline browser hint still attempts the server without local fallback',async()=>{
+ const s=setup({online:false,failure:true});await s.submit();assert.deepEqual(s.events,['server']);
 });
 test('unreachable server never falls back to the local password',async()=>{
  const s=setup({failure:true});await s.submit();assert.deepEqual(s.events,['server']);

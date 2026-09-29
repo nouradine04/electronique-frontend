@@ -64,10 +64,7 @@ export function RegistrationModal({
               </h2>
             </div>
 
-            {error && !(
-              (registerStep === 1 && (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())))
-              || (registerStep === 2 && (!shopName.trim() || password.length < 8))
-            ) && (
+            {error && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -76,35 +73,47 @@ export function RegistrationModal({
                 color: 'var(--danger)',
                 padding: '10px 12px',
                 borderRadius: '8px',
-                fontSize: '12px',
+                fontSize: '13px',
                 fontWeight: '600',
                 marginBottom: '16px'
               }}>
-                <AlertCircle size={14} />
+                <AlertCircle size={16} />
                 <span>{error}</span>
               </div>
             )}
 
             <StepProgress step={registerStep} total={2} items={[{ label: 'Vous', icon: User }, { label: 'Boutique', icon: Store }]} />
+            
             <form onSubmit={handleRegister} noValidate>
               <FormStep stepKey={registerStep}>
-                {registerStep === 1 ? <>
-                  <FormField id="register-name" label="Votre nom" error={error && !adminName.trim() ? 'Indiquez votre nom.' : null}>
-                    <FormInput id="register-name" leadingIcon={<User size={18} />} type="text" autoComplete="name" placeholder="Votre nom" value={adminName} onChange={(e) => { setAdminName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !adminName.trim())} autoFocus />
+                {registerStep === 1 ? <div>
+                  <FormField id="register-name" label="Votre nom">
+                    <FormInput id="register-name" name="register-name" leadingIcon={<User size={18} />} type="text" autoComplete="name" maxLength={100} required placeholder="Votre nom" value={adminName} onChange={(e) => { setAdminName(e.target.value); setError(''); }} autoFocus />
                   </FormField>
-                  <FormField id="register-email" label="Email" error={error && !/^\S+@\S+\.\S+$/.test(email.trim()) ? 'Adresse email invalide.' : null}>
-                    <FormInput id="register-email" leadingIcon={<Mail size={18} />} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Votre email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} aria-invalid={Boolean(error && !/^\S+@\S+\.\S+$/.test(email.trim()))} />
+                  <FormField id="register-email" label="Email">
+                    <FormInput id="register-email" name="register-email" leadingIcon={<Mail size={18} />} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={100} required placeholder="Votre email" value={email} onChange={(e) => { setEmail(e.target.value); setError(''); }} />
                   </FormField>
-                  <div className="form-actions"><button type="button" className="btn btn-primary" onClick={goToCredentials}>Continuer <ArrowRight size={17} /></button></div>
-                </> : <>
-                  <FormField id="register-shop" label="Nom de la boutique" error={error && !shopName.trim() ? 'Indiquez le nom de votre boutique.' : null}>
-                    <FormInput id="register-shop" leadingIcon={<Store size={18} />} type="text" autoComplete="organization" placeholder="Nom de la boutique" value={shopName} onChange={(e) => { setShopName(e.target.value); setError(''); }} aria-invalid={Boolean(error && !shopName.trim())} autoFocus />
+                  <div className="form-actions">
+                    <button type="button" className="btn btn-primary" onClick={goToCredentials}>
+                      Continuer <ArrowRight size={17} />
+                    </button>
+                  </div>
+                </div> : <div>
+                  <FormField id="register-shop" label="Nom de la boutique">
+                    <FormInput id="register-shop" name="register-shop" leadingIcon={<Store size={18} />} type="text" autoComplete="organization" maxLength={100} required placeholder="Nom de la boutique" value={shopName} onChange={(e) => { setShopName(e.target.value); setError(''); }} autoFocus />
                   </FormField>
-                  <FormField id="register-password" label="Mot de passe" error={error && password.length < 8 ? '8 caractères minimum.' : null}>
-                    <FormInput id="register-password" leadingIcon={<LockKeyhole size={18} />} type="password" autoComplete="new-password" placeholder="8 caractères minimum" value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} aria-invalid={Boolean(error && password.length < 8)} />
+                  <FormField id="register-password" label="Mot de passe">
+                    <FormInput id="register-password" name="register-password" leadingIcon={<LockKeyhole size={18} />} type="password" autoComplete="new-password" maxLength={72} minLength={8} required placeholder="8 caractères minimum" value={password} onChange={(e) => { setPassword(e.target.value); setError(''); }} />
                   </FormField>
-                  <div className="form-actions"><button type="button" className="btn btn-secondary" onClick={() => { setError(''); setRegisterStep(1); }}>Retour</button><LoadingButton type="submit" loading={loading} className="btn btn-primary">Créer ma boutique</LoadingButton></div>
-                </>}
+                  <div className="form-actions">
+                    <button type="button" className="btn btn-secondary" onClick={() => { setError(''); setRegisterStep(1); }}>
+                      Retour
+                    </button>
+                    <LoadingButton type="submit" loading={loading} className="btn btn-primary">
+                      Créer ma boutique
+                    </LoadingButton>
+                  </div>
+                </div>}
               </FormStep>
             </form>
 

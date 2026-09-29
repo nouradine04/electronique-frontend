@@ -26,7 +26,9 @@ export async function requestJson<T>(endpoint: string, options: RequestInit = {}
     const abort = () => controller.abort();
     if (options.signal?.aborted) abort();
     options.signal?.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(abort, 30000);
+    // Prisma can wait 5 s for a connection and run a sync transaction for 30 s.
+    // Leave response/network headroom before treating the request as lost.
+    const timer = setTimeout(abort, endpoint.startsWith('/sync/') ? 45_000 : 30_000);
     try {
       return await fetch(apiUrl(endpoint), { ...options, signal: controller.signal, headers: getAuthHeaders(options.headers) });
     } catch { throw new NetworkError(); }

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { createRemoteChangesApplier } from '../src/services/remoteChanges.js';
+import { deletedIdsForShop, forgetDeletedShop, markRecordDeleted } from '../src/db/deletionScope.js';
 import { shouldSync, retryDelay, REMOTE_REFRESH_MS, reconnectDelay, jitteredRetryDelay } from '../src/services/syncPolicy.js';
 import { prepareLocalUser } from '../src/services/prepareLocalUser.js';
 import LocalUser from '../src/db/models/LocalUser.js';
@@ -19,6 +20,36 @@ const { acknowledgeVersions } = await import('data:text/javascript;base64,' + Bu
 const { markLocalChangesAsSynced } = require('@nozbe/watermelondb/sync/impl');
 
 class Product extends Model { static table = 'products'; }
+
+test('deleted IDs stay with their original shop until acknowledged', async () => {
+  const schema = appSchema({ version: 1, tables: [tableSchema({ name: 'products', columns: [
+    { name: 'shop_id', type: 'string', isIndexed: true }, { name: 'name', type: 'string' },
+  ] })] });
+  const adapter = new LokiAdapter({ schema, useWebWorker: false, useIncrementalIndexedDB: false,
+    _testLokiAdapter: new Loki.LokiMemoryAdapter(), extraLokiOptions: { autosave: false } });
+  const db = new Database({ adapter, modelClasses: [Product] });
+  const products = db.get('products');
+  const create = (id, shopId) => products.prepareCreateFromDirtyRaw({ id, shop_id: shopId, name: id,
+    _status: 'synced', _changed: '' });
+  await db.write(() => db.batch(create('a1', 'shop-a'), create('b1', 'shop-b')));
+  await markRecordDeleted(db, await products.find('a1'));
+  await markRecordDeleted(db, await products.find('b1'));
+  const ids = await db.adapter.getDeletedRecords('products');
+  assert.deepEqual(await deletedIdsForShop(db.adapter, 'products', ids, 'shop-a'), ['a1']);
+  assert.deepEqual(await deletedIdsForShop(db.adapter, 'products', ids, 'shop-b'), ['b1']);
+  assert.deepEqual(await deletedIdsForShop(db.adapter, 'products', ids, 'shop-c'), []);
+  await db.adapter.setLocal('nstock_deleted_shop_v1:products:legacy', '');
+  assert.deepEqual(await deletedIdsForShop(db.adapter, 'products', [...ids, 'legacy'], 'shop-a'), ['a1']);
+  await db.adapter.destroyDeletedRecords('products', ['a1']);
+  await forgetDeletedShop(db.adapter, 'products', ['a1']);
+  assert.deepEqual(await deletedIdsForShop(db.adapter, 'products', ['a1'], 'shop-a'), []);
+  assert.deepEqual(await deletedIdsForShop(db.adapter, 'products', await db.adapter.getDeletedRecords('products'), 'shop-b'), ['b1']);
+  const unsent = await db.write(() => products.create(record => {
+    record._setRaw('shop_id', 'shop-a'); record._setRaw('name', 'Unsent');
+  }));
+  await markRecordDeleted(db, unsent);
+  assert.deepEqual(await db.adapter.getDeletedRecords('products'), ['b1'], 'an unsent creation needs no server tombstone');
+});
 
 test('cloud account restoration preserves the server ID without treating it as a schema column', async () => {
   const schema = appSchema({ version: 1, tables: [tableSchema(localUserSchema)] });

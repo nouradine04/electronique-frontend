@@ -9,7 +9,7 @@ function setup() {
   let cursor=0, resolveServer, rejectServer;
   const server=new Promise((resolve,reject)=>{resolveServer=resolve;rejectServer=reject;});
   const source=fs.readFileSync(new URL('../src/pages/common/landing/useLandingPage.jsx',import.meta.url),'utf8');
-  const context={exports:{},navigator:{onLine:true},localStorage:{getItem:()=>null},require:path=>{
+  const context={exports:{},TextEncoder,navigator:{onLine:true},localStorage:{getItem:()=>null},require:path=>{
     if(path==='react')return {useEffect(){},useState(initial){const key=cursor++;if(!(key in state))state[key]=initial;return [state[key],value=>{state[key]=value;}];}};
     if(path.includes('translations'))return {landingTranslations:{fr:{}}};
     if(path.includes('react-i18next'))return {useTranslation:()=>({i18n:{language:'fr'}})};
@@ -38,14 +38,28 @@ test('server failure keeps registration form open without local creation',async(
   s.rejectServer(new Error('Serveur indisponible'));await pending;
   assert.deepEqual(s.events,['request']);assert.equal(s.render().error,'Serveur indisponible');
 });
-test('offline registration creates nothing',async()=>{
+test('registration tries the server despite a false offline browser hint and keeps data if it fails',async()=>{
   const s=setup();s.context.navigator.onLine=false;
-  await s.render().handleRegister({preventDefault(){}});
-  assert.deepEqual(s.events,[]);assert.match(s.render().error,/Internet requis/);
+  const pending=s.render().handleRegister({preventDefault(){}});
+  assert.deepEqual(s.events,['request']);
+  s.rejectServer(new Error('Serveur injoignable'));await pending;
+  assert.deepEqual(s.events,['request']);assert.match(s.render().error,/Serveur injoignable/);
 });
 
 test('mobile trailing email space is accepted and Enter on step one only advances the form',async()=>{
  const s=setup();const form=s.render();form.setEmail('owner@example.com ');form.setRegisterStep(1);
  await s.render().handleRegister({preventDefault(){}});
  assert.equal(s.render().registerStep,2);assert.equal(s.render().error,'');assert.deepEqual(s.events,[]);
+});
+
+test('autofilled name survives the first step even when its input is absent on submit',async()=>{
+ const s=setup();const form=s.render();form.setAdminName('');form.setRegisterStep(1);
+ const elements={'register-name':{value:'Nom Safari'},'register-email':{value:'owner@example.com'}};
+ await s.render().handleRegister({preventDefault(){},currentTarget:{elements}});
+ assert.equal(s.render().adminName,'Nom Safari');
+ assert.equal(s.render().registerStep,2);
+ const pending=s.render().handleRegister({preventDefault(){},currentTarget:{elements:{'register-shop':{value:'Shop'},'register-password':{value:'Test-password!'}}}});
+ assert.deepEqual(s.events,['request']);
+ s.resolveServer({user:{id:'remote-user'},shop:{id:'remote-shop'}});await pending;
+ assert.deepEqual(s.events,['request','local','switch','role','success']);
 });

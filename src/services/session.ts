@@ -53,7 +53,6 @@ function blockSession() {
   notify();
 }
 export async function sessionRequest(endpoint: string, payload: Record<string, unknown>) {
-  if (!navigator.onLine) throw new NetworkError();
   const response = await fetch(`${base()}${endpoint}`, {
     method: 'POST', credentials: 'include',
     signal: AbortSignal.timeout(15000),

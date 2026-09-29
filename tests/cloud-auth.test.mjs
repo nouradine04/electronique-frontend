@@ -31,19 +31,18 @@ test('server refusal does not create a local authenticated session', async () =>
   await assert.rejects(s.api.loginCloudAccount('user@example.com','wrong'),error);
   assert.equal(s.accepted.length,0);
 });
-test('offline cloud login does not send requests or create sessions', async () => {
+test('false offline browser hint still lets a reachable server authenticate', async () => {
   const s=setup(); s.context.navigator.onLine=false;
-  await assert.rejects(s.api.loginCloudAccount('user@example.com','password'));
-  assert.equal(s.calls.length,0); assert.equal(s.accepted.length,0);
+  await s.api.loginCloudAccount('user@example.com','password');
+  assert.equal(s.calls.length,1); assert.equal(s.accepted.length,1);
 });
 
 const registration = {shop_name:'Shop',name:'Owner',email:' Owner@Example.com ',password:' Exact Password! '};
-test('registration requires network and never accepts a session on server failure', async () => {
+test('registration attempts the server and never accepts a session on failure', async () => {
   const s=setup(); s.context.navigator.onLine=false;
-  await assert.rejects(s.api.registerCloudAccount(registration));
-  assert.equal(s.calls.length,0); assert.equal(s.accepted.length,0);
-  s.context.navigator.onLine=true; s.fail(new Error('Database unavailable'));
+  s.fail(new Error('Database unavailable'));
   await assert.rejects(s.api.registerCloudAccount(registration),/Database unavailable/);
+  assert.equal(s.calls.length,1);
   assert.equal(s.accepted.length,0);
 });
 test('registration waits for confirmed server user and shop', async () => {

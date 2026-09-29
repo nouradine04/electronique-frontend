@@ -25,7 +25,8 @@ export async function removeLegacyDemoUsers() {
   ).fetch();
   if (!demoUsers.length) return;
   await database.write(async () => {
-    await database.batch(...demoUsers.map(user => user.prepareMarkAsDeleted()));
+    // These were only bundled demo accounts, never business deletions to sync.
+    await database.batch(...demoUsers.map(user => user.prepareDestroyPermanently()));
   });
 }
 
@@ -53,11 +54,13 @@ export async function restoreLocalOwnerFromCloud(session, password) {
   const hashed = password ? await credentials(password) : existingUser
     ? { password_hash: existingUser.passwordHash, password_salt: existingUser.passwordSalt }
     : await credentials(crypto.randomUUID());
+  let shopRestored = false;
   const restored = await database.write(async () => {
     let shop;
     let shopOperation = null;
     try { shop = await database.get('shops').find(remoteShop.id); }
     catch {
+      shopRestored = true;
       shop = database.get('shops').prepareCreate(record => {
         record._raw.id = remoteShop.id;
         record.name = remoteShop.name || 'Ma boutique';
@@ -97,6 +100,11 @@ export async function restoreLocalOwnerFromCloud(session, password) {
     return user;
   }, 'session-restore');
   await flushLocalDatabase();
+  // IndexedDB may be evicted while localStorage survives. A freshly restored
+  // shop must start its pull from zero instead of reusing an orphaned cursor.
+  if (shopRestored) {
+    localStorage.removeItem(`lastPulledAt:${remoteUser.tenant_id}:${remoteShop.id}`);
+  }
   return restored;
 }
 

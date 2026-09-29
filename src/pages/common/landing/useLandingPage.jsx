@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import { restoreLocalOwnerFromCloud } from '../../../services/localAuth.js';
 import { closeDesktopVault, isTauriDesktop, openDesktopVault } from '../../../services/desktopVault';
 import { startDesktopBackupForShop } from '../../../services/desktopBackup';
-import { NetworkError } from '../../../services/session';
 import { registerCloudAccount } from '../../../services/cloudAuth';
 import { setBackupPassword } from '../../../services/backupCredential';
 import { useShop } from '../../../context/ShopContext.jsx';
@@ -68,53 +67,80 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
     setShowRegisterModal(true);
   };
 
-  const goToCredentials = () => {
-    if (!adminName.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setError('Indiquez votre nom et une adresse email valide.');
+  const formValue = (form, field, fallback) => {
+    const input = form?.elements?.namedItem?.(field) || form?.elements?.[field];
+    return typeof input?.value === 'string' ? input.value : fallback;
+  };
+
+  const goToCredentials = (event) => {
+    const form = event?.currentTarget?.form || event?.currentTarget;
+    const nameVal = formValue(form, 'register-name', adminName).trim();
+    const emailVal = formValue(form, 'register-email', email).trim();
+
+    if (!nameVal) {
+      setError('Indiquez votre nom.');
       return;
     }
+    if (nameVal.length > 100) {
+      setError('Votre nom ne doit pas dépasser 100 caractères.');
+      return;
+    }
+    if (emailVal.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+      setError('Indiquez une adresse email valide.');
+      return;
+    }
+    setAdminName(nameVal);
+    setEmail(emailVal);
     setError('');
     setRegisterStep(2);
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (registerStep === 1) { goToCredentials(); return; }
-    
-    // Forcer la lecture depuis les inputs HTML si le state React est vide (contourne le bug d'autofill sur mobile)
-    const elements = e.target.elements;
-    const finalAdminName = adminName || (elements['register-name'] ? elements['register-name'].value : '');
-    const finalEmail = email || (elements['register-email'] ? elements['register-email'].value : '');
-    const finalShopName = shopName || (elements['register-shop'] ? elements['register-shop'].value : '');
-    const finalPassword = password || (elements['register-password'] ? elements['register-password'].value : '');
-
-    if (!finalAdminName.trim() || !/^\S+@\S+\.\S+$/.test(finalEmail.trim())) {
-      setRegisterStep(1);
-      setError('Vérifiez votre nom et votre email.');
+    if (registerStep === 1) {
+      goToCredentials(e);
       return;
     }
+
+    // Les champs de la première étape peuvent être démontés par l'animation.
+    const finalAdminName = adminName.trim();
+    const finalEmail = email.trim();
+    const finalShopName = formValue(e.currentTarget, 'register-shop', shopName).trim();
+    const finalPassword = formValue(e.currentTarget, 'register-password', password);
+
+    if (!finalAdminName) {
+      setError('Indiquez votre nom.');
+      return;
+    }
+    if (finalAdminName.length > 100) {
+      setError('Votre nom ne doit pas dépasser 100 caractères.');
+      return;
+    }
+    if (finalEmail.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
+      setError('Indiquez une adresse email valide.');
+      return;
+    }
+    if (!finalShopName) {
+      setError('Indiquez le nom de votre boutique.');
+      return;
+    }
+    if (finalShopName.length > 100) {
+      setError('Le nom de la boutique ne doit pas dépasser 100 caractères.');
+      return;
+    }
+    if (finalPassword.length < 8) {
+      setError('Le mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (new TextEncoder().encode(finalPassword).length > 72) {
+      setError('Le mot de passe ne doit pas dépasser 72 octets.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
-    if (!finalShopName.trim()) {
-      setError('Indiquez le nom de votre boutique.');
-      setLoading(false);
-      return;
-    }
-    if (!finalAdminName.trim()) {
-      setError('Indiquez votre nom complet.');
-      setLoading(false);
-      return;
-    }
-    if (finalPassword.trim().length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.');
-      setLoading(false);
-      return;
-    }
-
     try {
-      if (!navigator.onLine) throw new NetworkError('Connexion Internet requise pour créer votre compte.');
-
       if (isTauriDesktop()) {
         await openDesktopVault(finalEmail, finalPassword);
       }
@@ -123,11 +149,11 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       const newUser = await restoreLocalOwnerFromCloud(session, finalPassword);
       const newShop = { id: session.shop.id };
 
-      setBackupPassword(password);
+      setBackupPassword(finalPassword);
       await switchShop(newShop.id);
       await startDesktopBackupForShop(newShop.id);
-      switchRole('owner', adminName, newUser.id);
-      
+      switchRole('owner', finalAdminName, newUser.id);
+
       setLoading(false);
       setShowRegisterModal(false);
       onLoginSuccess('owner');

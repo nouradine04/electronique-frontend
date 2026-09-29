@@ -36,9 +36,10 @@ test('session: memory-only access token, coalesced refresh, fixed offline deadli
   assert.equal(s.api.canWorkOffline(Date.parse(s.expiry)), false);
   s.context.navigator.onLine = false;
   s.api.invalidateAccessToken();
+  s.reply(async () => { throw new TypeError('Failed to fetch'); });
   await assert.rejects(s.api.ensureAccessToken(), /Serveur injoignable/);
   assert.equal(s.api.canWorkOffline(), true, 'network failure must not revoke offline access');
-  assert.equal(s.requests(), 1, 'no network attempt when offline');
+  assert.equal(s.requests(), 2, 'a false browser offline hint must not suppress the request');
 });
 
 test('session: explicit server refusal locks local writes; no local fallback', async () => {
@@ -63,6 +64,7 @@ test('existing session resumes offline; access expiry does not close it; logout 
   s.storage.set('nstock_session',JSON.stringify({userId:'u1',api:'https://api.medaaris.com',offlineAccessUntil:new Date(0).toISOString()}));
   assert.equal(s.api.hasStoredSessionFor('u1'),true,'expired session remains available for read-only access');
   assert.equal(s.api.canWorkOffline(),false);
+  s.reply(async () => { throw new TypeError('Failed to fetch'); });
   await assert.rejects(s.api.logoutSession());
   assert.equal(s.api.hasStoredSessionFor('u1'),false);
 });
