@@ -139,6 +139,7 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
 
     setLoading(true);
     setError('');
+    let accountCreated = false;
 
     try {
       if (isTauriDesktop()) {
@@ -146,6 +147,7 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       }
 
       const session = await registerCloudAccount({ shop_name: finalShopName, name: finalAdminName, email: finalEmail, password: finalPassword });
+      accountCreated = true;
       const newUser = await restoreLocalOwnerFromCloud(session, finalPassword);
       const newShop = { id: session.shop.id };
 
@@ -159,7 +161,16 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       onLoginSuccess('owner');
     } catch (err) {
       if (isTauriDesktop()) void closeDesktopVault();
-      setError(err.message || 'Une erreur est survenue lors de la création de la boutique.');
+      if (accountCreated) {
+        setError('Votre compte et votre boutique sont créés. La préparation sur cet appareil a échoué. Connectez-vous pour réessayer.');
+      } else if (/^name must be shorter than or equal to 100 characters$/i.test(err.message || '')) {
+        setRegisterStep(1);
+        setError('Votre nom ne doit pas dépasser 100 caractères.');
+      } else if (/^shop_name must be shorter than or equal to 100 characters$/i.test(err.message || '')) {
+        setError('Le nom de la boutique ne doit pas dépasser 100 caractères.');
+      } else {
+        setError(err.message || 'Une erreur est survenue lors de la création de la boutique.');
+      }
       setLoading(false);
     }
   };

@@ -76,3 +76,9 @@ test('old browser API override cannot redirect authentication to a different bac
   await s.api.sessionRequest('/auth/login',{email:'user@example.com',password:'test'});
   assert.equal(url,'https://api.medaaris.com/auth/login');
 });
+
+test('signup keeps the server message when the account was created but session setup failed', async () => {
+  const s=setup();
+  s.reply(async()=>({ok:false,status:503,json:async()=>({message:'Votre compte et votre boutique sont créés. Connectez-vous pour continuer.'})}));
+  await assert.rejects(s.api.sessionRequest('/auth/register',{}),/compte et votre boutique sont créés/);
+});

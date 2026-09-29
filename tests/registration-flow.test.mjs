@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 
 function setup() {
-  const state=[], events=[];
+  const state=[], events=[], requests=[];
   let cursor=0, resolveServer, rejectServer;
   const server=new Promise((resolve,reject)=>{resolveServer=resolve;rejectServer=reject;});
   const source=fs.readFileSync(new URL('../src/pages/common/landing/useLandingPage.jsx',import.meta.url),'utf8');
@@ -18,14 +18,14 @@ function setup() {
     if(path.includes('desktopBackup'))return {startDesktopBackupForShop:async()=>{}};
     if(path.includes('backupCredential'))return {setBackupPassword:()=>{}};
     if(path.includes('session'))return {NetworkError:Error};
-    if(path.includes('cloudAuth'))return {registerCloudAccount:()=>{events.push('request');return server;}};
+    if(path.includes('cloudAuth'))return {registerCloudAccount:input=>{events.push('request');requests.push(input);return server;}};
     if(path.includes('localAuth'))return {restoreLocalOwnerFromCloud:async session=>{events.push('local');assert.equal(session.shop.id,'remote-shop');return{id:'remote-user'};}};
     throw Error(path);
   }};
   vm.runInNewContext(ts.transpileModule(source,{fileName:'useLandingPage.jsx',compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,context);
   const render=()=>{cursor=0;return context.exports.useLandingPage({onLoginSuccess:()=>events.push('success')});};
   const form=render();form.setShopName('Shop');form.setAdminName('Owner');form.setEmail('owner@example.com');form.setPassword('Test-password!');form.setRegisterStep(2);
-  return {render,events,context,resolveServer,rejectServer};
+  return {render,events,requests,context,resolveServer,rejectServer};
 }
 test('registration never writes local account or enters app before server acknowledgement',async()=>{
   const s=setup();const pending=s.render().handleRegister({preventDefault(){}});
@@ -62,4 +62,33 @@ test('autofilled name survives the first step even when its input is absent on s
  assert.deepEqual(s.events,['request']);
  s.resolveServer({user:{id:'remote-user'},shop:{id:'remote-shop'}});await pending;
  assert.deepEqual(s.events,['request','local','switch','role','success']);
+});
+
+test('an overlong owner name is rejected before signup reaches the server',async()=>{
+ const s=setup();s.render().setAdminName('x'.repeat(101));
+ await s.render().handleRegister({preventDefault(){}});
+ assert.deepEqual(s.events,[]);
+ assert.match(s.render().error,/Votre nom ne doit pas dépasser 100 caractères/);
+});
+
+test('short names create the owner and shop in one request with exact credentials',async()=>{
+ const s=setup();const form=s.render();
+ form.setAdminName('  Ali  ');form.setShopName('  Mon magasin  ');
+ form.setEmail(' ALI@Example.com ');form.setPassword('  secret123  ');
+ const pending=s.render().handleRegister({preventDefault(){}});
+ assert.equal(s.requests.length,1);
+ assert.deepEqual(JSON.parse(JSON.stringify(s.requests[0])),{
+   shop_name:'Mon magasin',name:'Ali',email:'ALI@Example.com',password:'  secret123  '
+ });
+ s.resolveServer({user:{id:'remote-user'},shop:{id:'remote-shop'}});await pending;
+ assert.equal(s.events.at(-1),'success');
+});
+
+test('a local setup error after server confirmation says the account exists',async()=>{
+ const s=setup();s.render().setShopName('Shop');
+ const pending=s.render().handleRegister({preventDefault(){}});
+ s.resolveServer({user:{id:'remote-user'},shop:null});
+ await pending;
+ assert.match(s.render().error,/compte et votre boutique sont créés/);
+ assert.equal(s.events.includes('success'),false);
 });
