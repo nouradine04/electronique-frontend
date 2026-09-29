@@ -10,7 +10,7 @@ function setup() {
   const server=new Promise((resolve,reject)=>{resolveServer=resolve;rejectServer=reject;});
   const source=fs.readFileSync(new URL('../src/pages/common/landing/useLandingPage.jsx',import.meta.url),'utf8');
   const context={exports:{},TextEncoder,navigator:{onLine:true},localStorage:{getItem:()=>null},require:path=>{
-    if(path==='react')return {useEffect(){},useState(initial){const key=cursor++;if(!(key in state))state[key]=initial;return [state[key],value=>{state[key]=value;}];}};
+    if(path==='react')return {useEffect(){},useState(initial){const key=cursor++;if(!(key in state))state[key]=initial;return [state[key],value=>{state[key]=value;}];},useRef(initial){const key=cursor++;if(!(key in state))state[key]={current:initial};return state[key];}};
     if(path.includes('translations'))return {landingTranslations:{fr:{}}};
     if(path.includes('react-i18next'))return {useTranslation:()=>({i18n:{language:'fr'}})};
     if(path.includes('ShopContext'))return {useShop:()=>({switchShop:async()=>events.push('switch'),switchRole:()=>events.push('role')})};
@@ -84,6 +84,20 @@ test('short names create the owner and shop in one request with exact credential
  assert.equal(s.events.at(-1),'success');
 });
 
+test('step two sends the visible first-step fields even if React state is stale',async()=>{
+ const s=setup();s.render().setAdminName('x'.repeat(101));
+ const elements={
+   'register-name':{value:'Ali'},'register-email':{value:'ali@example.com'},
+   'register-shop':{value:'Mon magasin'},'register-password':{value:'secret123'},
+ };
+ const pending=s.render().handleRegister({preventDefault(){},currentTarget:{elements}});
+ assert.equal(s.requests.length,1);
+ assert.equal(s.requests[0].name,'Ali');
+ assert.equal(s.requests[0].shop_name,'Mon magasin');
+ s.resolveServer({user:{id:'remote-user'},shop:{id:'remote-shop'}});await pending;
+ assert.equal(s.events.at(-1),'success');
+});
+
 test('a local setup error after server confirmation says the account exists',async()=>{
  const s=setup();s.render().setShopName('Shop');
  const pending=s.render().handleRegister({preventDefault(){}});
@@ -91,4 +105,14 @@ test('a local setup error after server confirmation says the account exists',asy
  await pending;
  assert.match(s.render().error,/compte et votre boutique sont créés/);
  assert.equal(s.events.includes('success'),false);
+});
+
+test('two rapid taps submit only one registration',async()=>{
+ const s=setup(),form=s.render(),event={preventDefault(){}};
+ const first=form.handleRegister(event);
+ const second=form.handleRegister(event);
+ assert.equal(s.requests.length,1);
+ s.resolveServer({user:{id:'remote-user'},shop:{id:'remote-shop'}});
+ await Promise.all([first,second]);
+ assert.equal(s.events.filter(event=>event==='success').length,1);
 });

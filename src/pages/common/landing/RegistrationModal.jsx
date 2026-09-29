@@ -1,4 +1,4 @@
-import { FormStep, LoadingButton, StepProgress } from '../../../components/forms/FormUI';
+import { LoadingButton, StepProgress } from '../../../components/forms/FormUI';
 import { FormField, FormInput } from '../../../components/ui/FormControls';
 
 
@@ -85,8 +85,8 @@ export function RegistrationModal({
             <StepProgress step={registerStep} total={2} items={[{ label: 'Vous', icon: User }, { label: 'Boutique', icon: Store }]} />
             
             <form onSubmit={handleRegister} noValidate>
-              <FormStep stepKey={registerStep}>
-                {registerStep === 1 ? <div>
+              {/* Keep both steps mounted so browser autofill and back/forward preserve the same inputs. */}
+              <div className="form-step registration-step" hidden={registerStep !== 1}>
                   <FormField id="register-name" label="Votre nom">
                     <FormInput id="register-name" name="register-name" leadingIcon={<User size={18} />} type="text" autoComplete="name" maxLength={100} required placeholder="Votre nom" value={adminName} onChange={(e) => { setAdminName(e.target.value); setError(''); }} autoFocus />
                   </FormField>
@@ -98,7 +98,9 @@ export function RegistrationModal({
                       Continuer <ArrowRight size={17} />
                     </button>
                   </div>
-                </div> : <div>
+              </div>
+              <div className="form-step registration-step" hidden={registerStep !== 2}>
+                  <p className="registration-identity">{adminName.trim()} · {email.trim()}</p>
                   <FormField id="register-shop" label="Nom de la boutique">
                     <FormInput id="register-shop" name="register-shop" leadingIcon={<Store size={18} />} type="text" autoComplete="organization" maxLength={100} required placeholder="Nom de la boutique" value={shopName} onChange={(e) => { setShopName(e.target.value); setError(''); }} autoFocus />
                   </FormField>
@@ -113,8 +115,7 @@ export function RegistrationModal({
                       Créer ma boutique
                     </LoadingButton>
                   </div>
-                </div>}
-              </FormStep>
+              </div>
             </form>
 
             <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: 'var(--text-secondary)' }}>

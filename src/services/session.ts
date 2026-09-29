@@ -65,6 +65,9 @@ export async function sessionRequest(endpoint: string, payload: Record<string, u
       if (endpoint === '/auth/register' && typeof data.message === 'string' && data.message.startsWith('Votre compte et votre boutique sont créés.')) {
         throw new ApiError(response.status, data.message, data);
       }
+      if (typeof data.message === 'string' && data.message.includes('API de donnees desactivee en mode local')) {
+        throw new ApiError(response.status, 'Inscription et connexion indisponibles : le backend local fonctionne sans base de données.', data);
+      }
       throw new NetworkError(data.reference ? `Serveur temporairement indisponible. Référence : ${data.reference}` : undefined);
     }
     if (response.status === 401 && endpoint !== '/auth/logout') blockSession();

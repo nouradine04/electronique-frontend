@@ -1,6 +1,6 @@
 import { landingTranslations } from './translations';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import { restoreLocalOwnerFromCloud } from '../../../services/localAuth.js';
 import { closeDesktopVault, isTauriDesktop, openDesktopVault } from '../../../services/desktopVault';
@@ -59,6 +59,7 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [registerStep, setRegisterStep] = useState(1);
+  const registrationPending = useRef(false);
 
   const openRegistration = (plan = 'standard') => {
     setSelectedPlan(plan);
@@ -102,21 +103,24 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       return;
     }
 
-    // Les champs de la première étape peuvent être démontés par l'animation.
-    const finalAdminName = adminName.trim();
-    const finalEmail = email.trim();
+    // Read the mounted fields directly: autofill can update them after React's last change event.
+    const finalAdminName = formValue(e.currentTarget, 'register-name', adminName).trim();
+    const finalEmail = formValue(e.currentTarget, 'register-email', email).trim();
     const finalShopName = formValue(e.currentTarget, 'register-shop', shopName).trim();
     const finalPassword = formValue(e.currentTarget, 'register-password', password);
 
     if (!finalAdminName) {
+      setRegisterStep(1);
       setError('Indiquez votre nom.');
       return;
     }
     if (finalAdminName.length > 100) {
+      setRegisterStep(1);
       setError('Votre nom ne doit pas dépasser 100 caractères.');
       return;
     }
     if (finalEmail.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
+      setRegisterStep(1);
       setError('Indiquez une adresse email valide.');
       return;
     }
@@ -137,6 +141,8 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       return;
     }
 
+    if (registrationPending.current) return;
+    registrationPending.current = true;
     setLoading(true);
     setError('');
     let accountCreated = false;
@@ -156,7 +162,6 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       await startDesktopBackupForShop(newShop.id);
       switchRole('owner', finalAdminName, newUser.id);
 
-      setLoading(false);
       setShowRegisterModal(false);
       onLoginSuccess('owner');
     } catch (err) {
@@ -171,6 +176,8 @@ export function useLandingPage({ onLoginSuccess, onNavigate, initialView = 'land
       } else {
         setError(err.message || 'Une erreur est survenue lors de la création de la boutique.');
       }
+    } finally {
+      registrationPending.current = false;
       setLoading(false);
     }
   };

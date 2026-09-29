@@ -82,3 +82,9 @@ test('signup keeps the server message when the account was created but session s
   s.reply(async()=>({ok:false,status:503,json:async()=>({message:'Votre compte et votre boutique sont créés. Connectez-vous pour continuer.'})}));
   await assert.rejects(s.api.sessionRequest('/auth/register',{}),/compte et votre boutique sont créés/);
 });
+
+test('local backend without a database is reported distinctly from a network failure', async () => {
+  const s=setup();
+  s.reply(async()=>({ok:false,status:503,json:async()=>({message:'API de donnees desactivee en mode local. Les donnees sont conservees dans WatermelonDB.'})}));
+  await assert.rejects(s.api.sessionRequest('/auth/register',{}),/backend local fonctionne sans base de données/);
+});

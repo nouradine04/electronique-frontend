@@ -5,6 +5,10 @@
 .step-progress span { width: 30px; height: 30px; position: relative; z-index: 1; border-radius: 50%; display: grid; place-items: center; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 12px; font-weight: 700; }
 .step-progress span.done { background: #0e6ba8; border-color: #0e6ba8; color: white; }
 .form-step { display: grid; gap: 16px; }
+.registration-step[hidden] { display: none; }
+.registration-step:not([hidden]) { animation: registration-step-in .2s ease-out; }
+.registration-identity { margin: -4px 0 0; font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
+@keyframes registration-step-in { from { opacity: .35; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 .form-progress { list-style: none; padding: 0; display: flex; margin: 4px 0 18px; }
 .form-progress li { position: relative; flex: 1; min-width: 0; }
 .form-progress li:not(:last-child)::after { content: ''; position: absolute; top: 23px; left: calc(50% + 29px); width: calc(100% - 58px); height: 2px; background: var(--border-color); }
@@ -19,4 +23,4 @@
 .form-actions { display: flex; gap: 10px; margin-top: 6px; }
 .form-actions > button { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .form-actions > button:last-child { flex: 1; }
-@media (prefers-reduced-motion: reduce) { .form-spinner { animation-duration: 1.4s; } }
+@media (prefers-reduced-motion: reduce) { .form-spinner { animation-duration: 1.4s; } .registration-step:not([hidden]) { animation: none; } }
