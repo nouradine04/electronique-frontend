@@ -17,9 +17,9 @@ const ts = require('typescript');
 const versionsSource = fs.readFileSync(new URL('../src/services/acknowledgeVersions.ts', import.meta.url), 'utf8');
 const versionsJs = ts.transpileModule(versionsSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const { acknowledgeVersions } = await import('data:text/javascript;base64,' + Buffer.from(versionsJs).toString('base64'));
-const legacyStockSource = fs.readFileSync(new URL('../src/services/legacyStockOperation.ts', import.meta.url), 'utf8');
+const legacyStockSource = fs.readFileSync(new URL('../src/services/legacyMovementCosts.ts', import.meta.url), 'utf8');
 const legacyStockJs = ts.transpileModule(legacyStockSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const { completeInitialStockCost } = await import('data:text/javascript;base64,' + Buffer.from(legacyStockJs).toString('base64'));
+const { completeLegacyMovementCosts } = await import('data:text/javascript;base64,' + Buffer.from(legacyStockJs).toString('base64'));
 const { markLocalChangesAsSynced } = require('@nozbe/watermelondb/sync/impl');
 
 test('old initial stock operation recovers its cost without changing unrelated movements', () => {
@@ -30,11 +30,24 @@ test('old initial stock operation recovers its cost without changing unrelated m
     products: { created: [product], updated: [], deleted: [] },
     stock_movements: { created: [initial, other], updated: [], deleted: [] },
   };
-  const completed = completeInitialStockCost({ kind: 'stock', changes });
+  const completed = completeLegacyMovementCosts({ kind: 'stock', changes });
   assert.equal(completed.stock_movements.created[0].unit_cost, product.unit_cost);
   assert.equal(completed.stock_movements.created[1].unit_cost, undefined);
   assert.equal(initial.unit_cost, undefined, 'the stored operation remains untouched');
-  assert.equal(completeInitialStockCost({ kind: 'checkout', changes }), changes);
+  assert.equal(completeLegacyMovementCosts({ kind: 'checkout', changes }), changes);
+});
+
+test('old checkout recovers movement cost from its sale without changing the queued payload', () => {
+  const sale = { id: 'sale-1', product_id: 'phone-1', unit_cost: 75000 };
+  const movement = { id: 'movement-1', product_id: sale.product_id, type: 'OUT', reason: 'Vente client' };
+  const changes = {
+    sales: { created: [sale], updated: [], deleted: [] },
+    stock_movements: { created: [movement], updated: [], deleted: [] },
+  };
+  const completed = completeLegacyMovementCosts({ kind: 'checkout', changes });
+  assert.equal(completed.stock_movements.created[0].unit_cost, sale.unit_cost);
+  assert.equal(movement.unit_cost, undefined);
+  assert.equal(completeLegacyMovementCosts({ kind: 'return', changes }), changes);
 });
 
 class Product extends Model { static table = 'products'; }

@@ -166,6 +166,7 @@ export function usePos({ setActiveTab }) {
             m.reason = 'Vente client';
             m.userName = userName || 'Utilisateur';
             m.date = now;
+            m.unitCost = item.product.unitCost || 0;
             m.synced = false;
           }));
           operations.push(item.product.prepareUpdate(p => {

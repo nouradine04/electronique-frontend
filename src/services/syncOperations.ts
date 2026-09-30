@@ -4,7 +4,7 @@ import { markAsSynced } from '../db/queries';
 import { requestJson } from './apiClient';
 import type { OperationPayload } from './operationQueue';
 import type { PushChangesResponse } from '../models/sync';
-import { completeInitialStockCost } from './legacyStockOperation';
+import { completeLegacyMovementCosts } from './legacyMovementCosts';
 
 const raw = (record: Model) => record._raw as unknown as Record<string, any>;
 
@@ -49,7 +49,7 @@ export async function pushPendingOperations(shopId: string, retryBlocked = false
       // accepted before the response was lost. Repair only a confirmed rejection.
       const details = error.details as { code?: string; table?: string } | undefined;
       if (error.status === 400 && details?.code === 'SYNC_VALIDATION' && details.table === 'stock_movements') {
-        const repaired = completeInitialStockCost(payload);
+        const repaired = completeLegacyMovementCosts(payload);
         if (repaired !== payload.changes) {
           try { ack = await send(repaired); }
           catch (retryError) { error = retryError; }
