@@ -144,7 +144,8 @@ export const createProduct = async (data) => {
     if (quantity > 0) {
       operations.push(stockMovements.prepareCreate(m => {
         m.shopId = data.shop_id; m.productId = product.id; m.type = 'IN'; m.quantity = quantity;
-        m.reason = 'Stock initial'; m.date = new Date().toISOString(); m.userName = data.added_by || ''; m.synced = false;
+        m.reason = 'Stock initial'; m.date = new Date().toISOString(); m.userName = data.added_by || '';
+        m.unitCost = product.unitCost; m.synced = false;
       }));
       const journal = await prepareOperation(database, data.shop_id, operations, { kind: 'stock', stock_before: 0 });
       operations.push(...journal);

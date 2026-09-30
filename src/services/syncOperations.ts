@@ -4,6 +4,7 @@ import { markAsSynced } from '../db/queries';
 import { requestJson } from './apiClient';
 import type { OperationPayload } from './operationQueue';
 import type { PushChangesResponse } from '../models/sync';
+import { completeInitialStockCost } from './legacyStockOperation';
 
 const raw = (record: Model) => record._raw as unknown as Record<string, any>;
 
@@ -37,15 +38,28 @@ export async function pushPendingOperations(shopId: string, retryBlocked = false
         baseVersions[table][snapshot.id] = Number(raw(record).version) || 0;
       }
     }
-    let ack: PushChangesResponse;
+    const send = (changes: OperationPayload['changes']) => requestJson<PushChangesResponse>(`/sync/operations?shopId=${encodeURIComponent(shopId)}`, {
+      method: 'POST', body: JSON.stringify({ id: operation.id, kind: payload.kind || 'checkout', stock_before: payload.stock_before, changes, base_versions: baseVersions }),
+    });
+    let ack: PushChangesResponse | undefined;
     try {
-      ack = await requestJson<PushChangesResponse>(`/sync/operations?shopId=${encodeURIComponent(shopId)}`, {
-        method: 'POST', body: JSON.stringify({ id: operation.id, kind: payload.kind || 'checkout', stock_before: payload.stock_before, changes: payload.changes, base_versions: baseVersions }),
-      });
+      ack = await send(payload.changes);
     } catch (error) {
-      if (![400, 403, 409].includes(error.status)) throw error;
-      await database.write(() => operation.update(item => { raw(item).state = 'blocked'; raw(item).error = String(error.message); }));
-      continue;
+      // Preserve the original payload hash for an operation the server may have
+      // accepted before the response was lost. Repair only a confirmed rejection.
+      const details = error.details as { code?: string; table?: string } | undefined;
+      if (error.status === 400 && details?.code === 'SYNC_VALIDATION' && details.table === 'stock_movements') {
+        const repaired = completeInitialStockCost(payload);
+        if (repaired !== payload.changes) {
+          try { ack = await send(repaired); }
+          catch (retryError) { error = retryError; }
+        }
+      }
+      if (!ack) {
+        if (![400, 403, 409].includes(error.status)) throw error;
+        await database.write(() => operation.update(item => { raw(item).state = 'blocked'; raw(item).error = String(error.message); }));
+        continue;
+      }
     }
     const total = Object.values(payload.snapshots).reduce((n, group) => n + group.created.length + group.updated.length, 0);
     if (ack.has_more || ack.processed !== total || Object.values(ack.rejected_ids || {}).some(ids => ids.length)) throw new Error('Confirmation incomplète. L’opération reste en attente.');

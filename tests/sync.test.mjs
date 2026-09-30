@@ -17,7 +17,25 @@ const ts = require('typescript');
 const versionsSource = fs.readFileSync(new URL('../src/services/acknowledgeVersions.ts', import.meta.url), 'utf8');
 const versionsJs = ts.transpileModule(versionsSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const { acknowledgeVersions } = await import('data:text/javascript;base64,' + Buffer.from(versionsJs).toString('base64'));
+const legacyStockSource = fs.readFileSync(new URL('../src/services/legacyStockOperation.ts', import.meta.url), 'utf8');
+const legacyStockJs = ts.transpileModule(legacyStockSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const { completeInitialStockCost } = await import('data:text/javascript;base64,' + Buffer.from(legacyStockJs).toString('base64'));
 const { markLocalChangesAsSynced } = require('@nozbe/watermelondb/sync/impl');
+
+test('old initial stock operation recovers its cost without changing unrelated movements', () => {
+  const product = { id: 'phone-1', unit_cost: 75000 };
+  const initial = { id: 'movement-1', product_id: product.id, type: 'IN', reason: 'Stock initial' };
+  const other = { id: 'movement-2', product_id: product.id, type: 'IN', reason: 'Réapprovisionnement' };
+  const changes = {
+    products: { created: [product], updated: [], deleted: [] },
+    stock_movements: { created: [initial, other], updated: [], deleted: [] },
+  };
+  const completed = completeInitialStockCost({ kind: 'stock', changes });
+  assert.equal(completed.stock_movements.created[0].unit_cost, product.unit_cost);
+  assert.equal(completed.stock_movements.created[1].unit_cost, undefined);
+  assert.equal(initial.unit_cost, undefined, 'the stored operation remains untouched');
+  assert.equal(completeInitialStockCost({ kind: 'checkout', changes }), changes);
+});
 
 class Product extends Model { static table = 'products'; }
 
