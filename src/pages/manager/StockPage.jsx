@@ -129,7 +129,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
       }
       setProductFormModal({ open: false, product: null });
     } catch (err) {
-      showToast('Erreur: ' + err.message, 'danger');
+      throw err;
     }
   };
 

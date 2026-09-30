@@ -50,9 +50,9 @@ export function AdminStockPage() {
     try {
       await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName , status: 'ACTIVE' });
       setShowAddProduct(false);
-      showToast('Produit ajouté et disponible à la vente.', 'success');
+      showToast('Produit enregistré et disponible à la vente.', 'success');
     } catch (error) {
-      showToast(`Impossible d’ajouter le produit : ${error.message}`, 'danger');
+      throw error;
     }
   };
 

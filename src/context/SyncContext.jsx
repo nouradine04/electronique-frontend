@@ -25,6 +25,7 @@ const RETRY_INTERVAL = 15000; // 15s entre les tentatives
 const SYNC_ON_FOCUS = true;   // Re-sync quand l'onglet devient actif
 const SYNC_BATCH_SIZE = 500;
 const MAX_PUSH_BATCHES_PER_RUN = 10;
+const HELD_RETRY_INTERVAL = 10 * 60 * 1000;
 const cloudImage = value => /^https?:\/\//i.test(String(value || '')) ? value : undefined;
 
 const payloadStateKeys = {
@@ -175,7 +176,6 @@ export function SyncProvider({ children }) {
         id: s.id,
         shop_id: s.shopId,
         product_id: s.productId,
-        variant_id: s.productId,
         client_id: s.clientId,
         quantity: s.quantity,
         total_price: s.totalPrice,
@@ -206,7 +206,6 @@ export function SyncProvider({ children }) {
         id: m.id,
         shop_id: m.shopId,
         product_id: m.productId,
-        variant_id: m.productId,
         movement_type: m.type,
         quantity: m.quantity,
         reason: m.reason,
@@ -280,17 +279,21 @@ export function SyncProvider({ children }) {
       const tenantId = currentShop.accountId || currentShop.id;
       const cursorKey = `lastPulledAt:${tenantId}:${currentShop.id}`;
       if (syncSchedule.current.key !== cursorKey) {
-        syncSchedule.current = { key: cursorKey, lastSuccess: 0, retryAt: syncSchedule.current.retryAt, failures: 0 };
+        syncSchedule.current = { key: cursorKey, lastSuccess: 0, retryAt: syncSchedule.current.retryAt, failures: 0, lastHeldRetryAt: 0 };
       }
       const schedule = syncSchedule.current;
-      if (force === true) clearSyncConflicts(cursorKey);
-      let excluded = readSyncConflicts(cursorKey);
+      const retryHeld = force === true || Date.now() - (schedule.lastHeldRetryAt || 0) >= HELD_RETRY_INTERVAL;
+      let excluded = retryHeld ? {} : readSyncConflicts(cursorKey);
       const pending = (await getUnsyncedRecords(currentShop.id, userRole === 'owner', 1, excluded)).total + await pendingOperationCount(currentShop.id);
       if (!shouldSync({ ...schedule, pending, now: Date.now(), force: force === true, visible: document.visibilityState !== 'hidden' })) return;
       setIsSyncing(true);
       await ensureAccessToken();
       const storedPullTimestamp = Number(localStorage.getItem(cursorKey) || 0);
-      const operationState = await pushPendingOperations(currentShop.id, force === true);
+      if (retryHeld) {
+        clearSyncConflicts(cursorKey);
+        schedule.lastHeldRetryAt = Date.now();
+      }
+      const operationState = await pushPendingOperations(currentShop.id, retryHeld);
       for (let batchIndex = 0; batchIndex < MAX_PUSH_BATCHES_PER_RUN; batchIndex += 1) {
         let batch = await getUnsyncedRecords(
           currentShop.id,
@@ -340,7 +343,7 @@ export function SyncProvider({ children }) {
 
       setLastSyncedAt(new Date());
       const held = Object.values(excluded).reduce((count, ids) => count + ids.length, 0);
-      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) en attente de correction. Les données sont conservées.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : '');
+      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) non acceptée(s) par le serveur. Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : '');
       schedule.lastSuccess = Date.now();
       schedule.failures = 0;
       schedule.retryAt = 0;
@@ -378,7 +381,7 @@ export function SyncProvider({ children }) {
       const delay = reconnectDelay();
       syncSchedule.current.retryAt = Math.max(syncSchedule.current.retryAt, Date.now() + delay);
       clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => syncWithBackend(), delay + 10);
+      reconnectTimer = setTimeout(() => syncWithBackend(true), delay + 10);
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -408,7 +411,7 @@ export function SyncProvider({ children }) {
   // l'événement `online` prennent ensuite le relais sans demander à l'utilisateur.
   useEffect(() => {
     if (LOCAL_ONLY || !isOnline || !currentShop) return;
-    const timer = setTimeout(() => syncWithBackend(), reconnectDelay());
+    const timer = setTimeout(() => syncWithBackend(true), reconnectDelay());
     return () => clearTimeout(timer);
   }, [currentShop, isOnline, syncWithBackend]);
 

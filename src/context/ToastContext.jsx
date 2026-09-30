@@ -14,8 +14,8 @@ export function useToast() {
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const showToast = useCallback((message, type = 'info', duration = 4000) => {
-    const id = Date.now().toString();
+  const showToast = useCallback((message, type = 'info', duration = 5000) => {
+    const id = crypto.randomUUID();
     setToasts(prev => [...prev, { id, message, type, duration }]);
   }, []);
 
@@ -46,21 +46,24 @@ export function ToastProvider({ children }) {
 
 function ToastItem({ toast, onRemove }) {
   const [isClosing, setIsClosing] = useState(false);
+  const [removalTimer, setRemovalTimer] = useState(null);
+
+  const close = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    setRemovalTimer(window.setTimeout(() => onRemove(toast.id), 300));
+  }, [isClosing, onRemove, toast.id]);
 
   useEffect(() => {
-    if (toast.duration > 0) {
-      const timer = setTimeout(() => {
-        setIsClosing(true);
-        setTimeout(() => onRemove(toast.id), 300); // Wait for animation
-      }, toast.duration);
-      return () => clearTimeout(timer);
+    if (toast.duration > 0 && !isClosing) {
+      const timer = window.setTimeout(close, toast.duration);
+      return () => window.clearTimeout(timer);
     }
-  }, [toast, onRemove]);
+  }, [toast.duration, close, isClosing]);
 
-  const handleClose = () => {
-    setIsClosing(true);
-    setTimeout(() => onRemove(toast.id), 300);
-  };
+  useEffect(() => () => window.clearTimeout(removalTimer), [removalTimer]);
+
+  const handleClose = close;
 
   const getTypeStyles = (type) => {
     switch (type) {
@@ -136,6 +139,8 @@ function ToastItem({ toast, onRemove }) {
       {/* Close Button */}
       <button 
         onClick={handleClose}
+        type="button"
+        aria-label="Fermer la notification"
         style={{
           background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
           zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',

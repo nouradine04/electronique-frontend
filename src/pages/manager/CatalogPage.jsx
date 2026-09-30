@@ -57,10 +57,10 @@ export function CatalogManagementPage() {
         return;
       }
       await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName });
-      showToast('Produit ajouté avec succès', 'success');
+      showToast('Produit enregistré. L’administrateur fixera les prix.', 'success');
       setShowAddWizard(false);
     } catch (err) {
-      showToast('Erreur: ' + err.message, 'danger');
+      throw err;
     }
   };
 

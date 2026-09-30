@@ -62,7 +62,8 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     category_id: initialCategoryId,
     description: initialData?.description || '',
     quantity: initialData ? Number(initialData.quantity || 0) : '',
-    min_stock: Number(readInitial(initialData, 'min_stock', 'minStock') || 5),
+    min_stock: initialData && Number(readInitial(initialData, 'min_stock', 'minStock')) > 0
+      ? readInitial(initialData, 'min_stock', 'minStock') : '',
     unit_cost: readInitial(initialData, 'unit_cost', 'unitCost'),
     price: initialData?.price ?? '',
     location: initialData?.location || '',
@@ -209,7 +210,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     }
   };
 
-  const totalSteps = 2;
+  const totalSteps = catalogOnly ? 2 : 3;
   const selectedCategory = categories.find(category => category.id === formData.category_id);
   const needsVariant = /t[ée]l[ée]phone|smartphone|phone|tablette/i.test(selectedCategory?.name || '');
 
@@ -218,17 +219,22 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   }, [selectedCategory?.name, initialData, formData.tracking_mode]);
 
   const tracksInitialUnits = !initialData && formData.tracking_mode !== 'QUANTITY';
-  const initialQuantity = tracksInitialUnits ? String(formData.identifiers).split(/[\n,;]+/).filter(value => value.trim()).length : formData.quantity;
+  const initialQuantity = formData.quantity;
 
   const validateStep = current => {
     if (current === 1 && !formData.name.trim()) return 'Indiquez le nom du produit.';
     if (current === 1 && !selectedCategory) return 'Choisissez une catégorie pour le produit.';
     if (current === 1 && needsVariant && (!formData.storage_capacity || !formData.color)) return 'Choisissez la capacité et la couleur.';
-    if (!catalogOnly && current === 2 && (initialQuantity === '' || !Number.isInteger(Number(initialQuantity)) || Number(initialQuantity) < 0 || formData.min_stock === '' || !Number.isInteger(Number(formData.min_stock)) || Number(formData.min_stock) < 1)) return 'Indiquez une quantité entière positive ou nulle et un seuil d’au moins 1.';
+    if (!catalogOnly && current === 2 && (initialQuantity === '' || !Number.isInteger(Number(initialQuantity)) || Number(initialQuantity) < 0)) return 'Indiquez une quantité entière positive ou nulle.';
     if (!catalogOnly && current === 2 && tracksInitialUnits) {
-      try { parseIdentifiers(formData.identifiers, formData.tracking_mode); } catch (error) { return error.message; }
+      try {
+        const identifiers = parseIdentifiers(formData.identifiers, formData.tracking_mode);
+        if (identifiers.length !== Number(initialQuantity)) return `Indiquez ${initialQuantity} identifiant(s), un par appareil.`;
+      } catch (error) { return error.message; }
     }
-    if (!catalogOnly && current === 2 && isOwner && ([formData.unit_cost, formData.price].some(value => value === '' || !Number.isFinite(Number(value)) || Number(value) < 0))) return 'Indiquez le coût d’achat et le prix de vente. Vous pouvez saisir 0 si nécessaire.';
+    if (!catalogOnly && current === 3 && formData.min_stock !== '' && (!Number.isInteger(Number(formData.min_stock)) || Number(formData.min_stock) < 1)) return 'Le seuil d’alerte doit être un nombre entier d’au moins 1.';
+    if (!catalogOnly && current === 3 && isOwner && ([formData.unit_cost, formData.price].some(value => value === '' || !Number.isFinite(Number(value)) || Number(value) < 0))) return 'Indiquez le coût d’achat et le prix de vente. Vous pouvez saisir 0 si nécessaire.';
+    if (!catalogOnly && current === 3 && isOwner && Number(formData.unit_cost) > Number(formData.price)) return 'Le prix de vente doit être au moins égal au coût d’achat.';
     return '';
   };
 
@@ -250,7 +256,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     event.preventDefault();
     if (saving) return;
     if (step < totalSteps) { nextStep(); return; }
-    for (const page of catalogOnly ? [1] : [1, 2]) {
+    for (const page of catalogOnly ? [1] : [1, 2, 3]) {
       const message = validateStep(page);
       if (message) { setStep(page); setFormError(message); return; }
     }
@@ -268,7 +274,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     const finalData = {
       ...formData,
       quantity: Number(initialQuantity),
-      min_stock: Number(formData.min_stock),
+      min_stock: formData.min_stock === '' ? 5 : Number(formData.min_stock),
       unit_cost: Number(formData.unit_cost),
       price: Number(formData.price),
       name: exactVariantName,
@@ -351,7 +357,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
         </div>
 
         <form className="wizard-form" onSubmit={handleSubmit} noValidate style={{ overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <StepProgress step={step} total={totalSteps} items={catalogOnly ? [{ label: 'Produit', icon: Package }, { label: 'Vérifier', icon: ClipboardCheck }] : [{ label: 'Produit', icon: Package }, { label: 'Stock', icon: Wallet }]} onSelect={saving ? undefined : page => { setFormError(''); setStep(page); }} />
+          <StepProgress step={step} total={totalSteps} items={catalogOnly ? [{ label: 'Produit', icon: Package }, { label: 'Vérifier', icon: ClipboardCheck }] : [{ label: 'Produit', icon: Package }, { label: 'Quantité', icon: ClipboardCheck }, { label: 'Prix & alerte', icon: Wallet }]} onSelect={saving ? undefined : page => { setFormError(''); setStep(page); }} />
           {formError && <div id="product-form-error" className="wizard-error" role="alert">{formError}</div>}
           {step === 1 && <FormStep stepKey={step}>
           <div className="manual-product-fields"><div>
@@ -489,27 +495,31 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
             </label>
             {!initialData && formData.tracking_mode !== 'QUANTITY' && <><IdentifierPhotoReader mode={formData.tracking_mode} value={formData.identifiers} onChange={identifiers => setFormData(previous => ({ ...previous, identifiers }))} /><label style={labelStyle}>{formData.tracking_mode === 'IMEI' ? 'IMEI principal' : 'Numéro de série'} · un par ligne *
               <textarea name="identifiers" value={formData.identifiers} onChange={handleChange} rows={3} style={{ ...inputStyle, height: 'auto', resize: 'vertical' }} placeholder="Un identifiant par appareil" />
-              <small>Un appareil = un identifiant unique, même modèle et même couleur. La quantité se calcule automatiquement.</small>
+              <small>Un appareil = un identifiant unique. Saisissez le même nombre d’identifiants que la quantité reçue.</small>
             </label></>}
             <div className="wizard-field-grid" style={responsiveGrid}>
-              <div><label htmlFor="product-quantity" style={labelStyle}>Quantité initiale *</label><input id="product-quantity" readOnly={tracksInitialUnits} disabled={!!initialData && formData.tracking_mode !== 'QUANTITY'} type="number" name="quantity" min="0" value={initialQuantity} onChange={handleChange} style={inputStyle} required /></div>
-              <details className="wizard-optional"><summary>Alerte de stock · {formData.min_stock || 5} articles</summary><label htmlFor="product-min-stock" style={labelStyle}>Me prévenir en dessous de</label><input id="product-min-stock" type="number" name="min_stock" min="1" value={formData.min_stock} onChange={handleChange} style={inputStyle} /></details>
+              <div><label htmlFor="product-quantity" style={labelStyle}>Quantité initiale <span className="required-mark">*</span></label><input id="product-quantity" disabled={!!initialData && formData.tracking_mode !== 'QUANTITY'} type="number" inputMode="numeric" name="quantity" min="0" step="1" placeholder="Ex : 10" value={initialQuantity} onChange={handleChange} style={inputStyle} required />{!!initialData && formData.tracking_mode !== 'QUANTITY' && <small>Le stock des appareils suivis se modifie par entrée ou sortie de stock.</small>}</div>
             </div>
 
-            {!isOwner && (
-              <div style={{ marginTop: '12px', padding: '12px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-main)', borderLeft: '4px solid var(--accent-primary)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                Le produit sera envoyé à l’administrateur, qui renseignera le coût d’achat et le prix de vente avant sa mise en vente.
-              </div>
-            )}
           </section></FormStep>}
 
-          {!catalogOnly && step === 2 && isOwner && <section>
+          {!catalogOnly && step === 3 && <FormStep stepKey={step}><section>
+            <button type="button" className="product-step-summary" onClick={() => setStep(2)}>
+              {formData.image_url ? <LocalImage src={formData.image_url} alt="" /> : <Package size={20} />}
+              <span><strong>{formData.name || 'Produit sans nom'}</strong><small>{initialQuantity} article(s)</small></span><Pencil size={16} />
+            </button>
+            <div className="wizard-step-heading"><strong>Alerte de stock</strong><span>Facultatif · seuil de 5 articles si vous ne le renseignez pas.</span></div>
+            <label htmlFor="product-min-stock" style={labelStyle}>Me prévenir en dessous de</label>
+            <input id="product-min-stock" type="number" inputMode="numeric" name="min_stock" min="1" step="1" placeholder="5" value={formData.min_stock} onChange={handleChange} style={inputStyle} />
+          </section>
+          {isOwner ? <section>
             <div className="wizard-step-heading"><strong>Fixer les prix</strong><span>Ces informations servent au calcul de la rentabilité.</span></div>
             <div className="wizard-field-grid" style={responsiveGrid}>
               <div><label htmlFor="product-unit_cost" style={labelStyle}>Coût d’achat *</label><AmountInput label="Coût d’achat" name="unit_cost" value={formData.unit_cost} onChange={handleChange} /></div>
               <div><label htmlFor="product-price" style={labelStyle}>Prix de vente *</label><AmountInput label="Prix de vente" name="price" value={formData.price} onChange={handleChange} /></div>
             </div>
-          </section>}
+          </section> : <p className="wizard-step-heading">L’administrateur renseignera les prix avant la mise en vente.</p>}
+          </FormStep>}
 
           {catalogOnly && step === totalSteps && <FormStep stepKey={step}>
             <div className="wizard-step-heading"><strong>Tout est correct ?</strong><span>Vérifiez votre fiche avant de l’enregistrer.</span></div>

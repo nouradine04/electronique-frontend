@@ -32,7 +32,7 @@ export async function prepareReceivedUnits(db: Database, product: Model, text: s
   if (identifiers.length !== expected) throw new Error(`Identifiez les ${expected} appareils reçus (un identifiant par ligne).`);
   if (!identifiers.length) return [];
   const duplicates = await db.get('product_units').query(Q.where('identifier_type', mode), Q.where('identifier', Q.oneOf(identifiers))).fetchCount();
-  if (duplicates) throw new Error('Un de ces identifiants existe déjà dans les données locales.');
+  if (duplicates) throw new Error('Cet IMEI ou numéro de série existe déjà pour un produit. Vérifiez les identifiants saisis.');
   const now = new Date().toISOString();
   return identifiers.flatMap(identifier => {
     const unit = db.get('product_units').prepareCreateFromDirtyRaw({ id: createLocalId(), shop_id: productData.shop_id, product_id: product.id, identifier, identifier_type: mode, state: 'AVAILABLE', received_at: now, synced: false });
