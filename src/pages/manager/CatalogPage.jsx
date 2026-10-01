@@ -9,8 +9,8 @@ import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { Search, Plus, Package, LayoutGrid, List } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProductCard } from './catalog/ProductCard.jsx';
+import { CatalogPagination } from './catalog/CatalogPagination.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
-import { Pagination } from '../../components/ui/Pagination.jsx';
 
 export function CatalogManagementPage() {
   const { currentShop, userName, userRole } = useShop();
@@ -27,7 +27,7 @@ export function CatalogManagementPage() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [catName, setCatName] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState(8);
   const [view, setView] = useState('grid');
 
   const BRAND = '#0e6ba8';
@@ -88,7 +88,7 @@ export function CatalogManagementPage() {
       if (statusFilter === 'IN_STOCK') statusMatch = product.quantity > 0 && product.status !== 'PENDING_PRICE';
       if (statusFilter === 'OUT_OF_STOCK') statusMatch = product.quantity === 0 && product.status !== 'PENDING_PRICE';
       if (statusFilter === 'PENDING') statusMatch = product.status === 'PENDING_PRICE';
-      return unitMatches.has(product.id) || (nameMatch && catMatch && statusMatch);
+      return nameMatch && catMatch && statusMatch;
     });
   }, [products, searchQuery, selectedCategory, statusFilter, unitMatches]);
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
@@ -154,8 +154,10 @@ export function CatalogManagementPage() {
           </select>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div role="group" aria-label="Catégories de produits" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <button 
+            type="button"
+            aria-pressed={selectedCategory === 'ALL'}
             onClick={() => setSelectedCategory('ALL')}
             style={{ padding: '8px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', border: selectedCategory === 'ALL' ? 'none' : '1px solid var(--border-color)', backgroundColor: selectedCategory === 'ALL' ? BRAND : 'var(--bg-surface)', color: selectedCategory === 'ALL' ? '#fff' : 'var(--text-primary)' }}
           >
@@ -164,6 +166,8 @@ export function CatalogManagementPage() {
           {categories.map(c => (
             <button 
               key={c.id}
+              type="button"
+              aria-pressed={selectedCategory === c.id}
               onClick={() => setSelectedCategory(c.id)}
               style={{ padding: '8px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', border: selectedCategory === c.id ? 'none' : '1px solid var(--border-color)', backgroundColor: selectedCategory === c.id ? BRAND : 'var(--bg-surface)', color: selectedCategory === c.id ? '#fff' : 'var(--text-primary)' }}
             >
@@ -183,30 +187,27 @@ export function CatalogManagementPage() {
         <div className="catalog-results">
           <div className="catalog-viewbar">
             <span className="catalog-viewbar-count">{filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''}</span>
-            <div className="catalog-viewbar-actions">
-              <div className="catalog-view-switch" role="group" aria-label="Affichage des produits">
-                <button type="button" aria-label="Afficher en grille" aria-pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={17} /></button>
-                <button type="button" aria-label="Afficher en liste" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
-              </div>
-              <label className="catalog-page-size">Afficher
-                <select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setCurrentPage(1); }}>
-                  <option value={8}>8</option>
-                  <option value={12}>12</option>
-                  <option value={24}>24</option>
-                </select>
-              </label>
+            <div className="catalog-view-switch" role="group" aria-label="Affichage des produits">
+              <button type="button" aria-label="Afficher en grille" aria-pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={17} /></button>
+              <button type="button" aria-label="Afficher en liste" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
             </div>
           </div>
           <div className={view === 'grid' ? 'catalog-grid' : 'catalog-list'}>
             {paginatedProducts.map(product => <ProductCard
               key={product.id}
               product={product}
-              categoryName={categories.find(category => category.id === product.categoryId)?.name}
               view={view}
               onOpen={() => setSelectedProductId(product.id)}
+              onEdit={() => setEditingProduct(product)}
             />)}
           </div>
-          <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredProducts.length} itemLabel="produit" onPageChange={setCurrentPage} />
+          <CatalogPagination
+            page={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={size => { setPageSize(size); setCurrentPage(1); }}
+          />
         </div>
       )}
 
