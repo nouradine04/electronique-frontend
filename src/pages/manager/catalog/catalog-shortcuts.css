@@ -1,0 +1,49 @@
+.catalog-brand-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 5px 0 7px;
+  scrollbar-width: thin;
+}
+.catalog-brand-label {
+  flex: 0 0 auto;
+  margin-right: 3px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 750;
+}
+.catalog-brand-shortcuts button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.catalog-brand-shortcuts button[aria-pressed="true"] {
+  border-color: #0e6ba8;
+  color: #0e6ba8;
+  background: color-mix(in srgb, var(--bg-surface) 87%, #0e6ba8);
+}
+.catalog-brand-shortcuts button small {
+  min-width: 18px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--bg-main);
+  font-size: 10px;
+  text-align: center;
+}
+.catalog-brand-shortcuts button:focus-visible {
+  outline: 2px solid #0e6ba8;
+  outline-offset: 2px;
+}

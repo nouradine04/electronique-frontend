@@ -13,7 +13,7 @@ import { useShop } from './ShopContext.jsx';
 import { pullChanges, pushChanges } from '../services/syncService';
 import { applyRemoteChanges } from '../services/applyRemoteChanges.js';
 import { shouldSync, jitteredRetryDelay, reconnectDelay } from '../services/syncPolicy.js';
-import { prepareBatchMedia } from '../services/syncMedia.js';
+import { prepareBatchMedia, recoverLocalProductMedia } from '../services/syncMedia.js';
 import { snapshotBatch } from '../services/syncSnapshot';
 import { pushPendingOperations, pendingOperationCount } from '../services/syncOperations';
 import { readSyncConflicts, saveSyncConflicts, clearSyncConflicts } from '../services/syncConflicts';
@@ -294,6 +294,7 @@ export function SyncProvider({ children }) {
         schedule.lastHeldRetryAt = Date.now();
       }
       const operationState = await pushPendingOperations(currentShop.id, retryHeld);
+      const mediaState = await recoverLocalProductMedia(currentShop.id);
       for (let batchIndex = 0; batchIndex < MAX_PUSH_BATCHES_PER_RUN; batchIndex += 1) {
         let batch = await getUnsyncedRecords(
           currentShop.id,
@@ -343,7 +344,7 @@ export function SyncProvider({ children }) {
 
       setLastSyncedAt(new Date());
       const held = Object.values(excluded).reduce((count, ids) => count + ids.length, 0);
-      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) à vérifier. ${operationState.errors[0] || ''} Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : '');
+      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) à vérifier. ${operationState.errors[0] || ''} Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : mediaState.failed ? `${mediaState.failed} photo(s) en attente d’envoi. Réessai automatique à la prochaine synchronisation.` : '');
       schedule.lastSuccess = Date.now();
       schedule.failures = 0;
       schedule.retryAt = 0;

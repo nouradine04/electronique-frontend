@@ -4,6 +4,13 @@ import { isLocalMediaReference, resolveLocalImage } from '../../services/localMe
 export function LocalImage({ src, fallback = null, ...props }) {
   const [resolvedSource, setResolvedSource] = useState(() => isLocalMediaReference(src) ? '' : (src || ''));
   const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    const onOnline = () => setRetry(value => value + 1);
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -32,7 +39,7 @@ export function LocalImage({ src, fallback = null, ...props }) {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [src]);
+  }, [src, retry]);
 
   if (!resolvedSource || failed) return fallback;
 

@@ -1,13 +1,19 @@
 import { apiUrl, getAuthHeaders } from './apiClient';
+import { ensureAccessToken, invalidateAccessToken } from './session';
 
 const localPrefix = 'local-media://';
 const pendingCache = () => `nstock-pending-images-${localStorage.getItem('currentUserId') || 'local'}`;
 const privateCache = () => `nstock-private-images-${localStorage.getItem('currentUserId') || 'local'}`;
 const localKey = value => `${location.origin}/__local-media/${value.slice(localPrefix.length)}`;
-export function isPrivateMediaUrl(value) {
-  try { const url = new URL(value); const base = new URL(apiUrl('/media/')); return url.origin === base.origin && url.pathname.startsWith(base.pathname); }
-  catch { return false; }
+function privateMediaPath(value) {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol)
+      && /^\/media\/[\w-]{1,36}\/[\w-]{1,36}\/[a-f0-9]{64}\.webp$/.test(url.pathname)
+      ? url.pathname : '';
+  } catch { return ''; }
 }
+export const isPrivateMediaUrl = value => Boolean(privateMediaPath(value));
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {
@@ -72,11 +78,18 @@ export async function resolveLocalImage(value) {
   }
   if (isPrivateMediaUrl(value)) {
     const cache = await caches.open(privateCache());
-    let response = await cache.match(value);
+    const canonicalUrl = apiUrl(privateMediaPath(value));
+    let response = await cache.match(canonicalUrl) || await cache.match(value);
     if (!response) {
-      response = await fetch(value, { headers: getAuthHeaders() });
+      await ensureAccessToken();
+      response = await fetch(canonicalUrl, { headers: getAuthHeaders() });
+      if (response.status === 401) {
+        invalidateAccessToken();
+        await ensureAccessToken();
+        response = await fetch(canonicalUrl, { headers: getAuthHeaders() });
+      }
       if (!response.ok) throw new Error('Image inaccessible.');
-      await cache.put(value, response.clone());
+      await cache.put(canonicalUrl, response.clone());
       const entries = await cache.keys();
       for (const entry of entries.slice(0, Math.max(0, entries.length - 300))) await cache.delete(entry);
     }
@@ -98,7 +111,7 @@ export async function uploadLocalImage(value, shopId) {
   if (!upload.ok) throw new Error(`Envoi de la photo impossible (${upload.status}).`);
   const { url } = await upload.json();
   if (!isPrivateMediaUrl(url)) throw new Error('Adresse de photo invalide.');
-  await (await caches.open(privateCache())).put(url, new Response(blob, { headers: { 'Content-Type': blob.type } }));
+  await (await caches.open(privateCache())).put(apiUrl(privateMediaPath(url)), new Response(blob, { headers: { 'Content-Type': blob.type } }));
   // Keep the pending copy until the local record has durably stored the new URL.
   return url;
 }

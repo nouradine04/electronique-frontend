@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { ProductCard } from './catalog/ProductCard.jsx';
 import { CatalogPagination } from './catalog/CatalogPagination.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
+import './catalog/catalog-shortcuts.css';
 
 export function CatalogManagementPage() {
   const { currentShop, userName, userRole } = useShop();
@@ -20,6 +21,7 @@ export function CatalogManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedBrand, setSelectedBrand] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [showAddWizard, setShowAddWizard] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -42,6 +44,20 @@ export function CatalogManagementPage() {
     currentShop ? queryProducts(currentShop.id) : null,
     [currentShop?.id]
   ) || [];
+
+  const brands = useMemo(() => {
+    if (selectedCategory === 'ALL') return [];
+    const groups = new Map();
+    for (const product of products) {
+      if (product.categoryId !== selectedCategory) continue;
+      const name = String(product.brand || '').trim();
+      if (!name) continue;
+      const key = name.toLocaleLowerCase('fr');
+      const current = groups.get(key);
+      groups.set(key, { key, name: current?.name || name, count: (current?.count || 0) + 1 });
+    }
+    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  }, [products, selectedCategory]);
 
   const handleSaveProduct = async (productData) => {
     try {
@@ -84,16 +100,18 @@ export function CatalogManagementPage() {
       const q = (searchQuery || '').toLowerCase();
       const nameMatch = unitMatches.has(product.id) || (product.name || '').toLowerCase().includes(q) || (product.sku || '').toLowerCase().includes(q);
       const catMatch = selectedCategory === 'ALL' || product.categoryId === selectedCategory;
+      const brandMatch = selectedBrand === 'ALL' || String(product.brand || '').trim().toLocaleLowerCase('fr') === selectedBrand;
       let statusMatch = true;
       if (statusFilter === 'IN_STOCK') statusMatch = product.quantity > 0 && product.status !== 'PENDING_PRICE';
       if (statusFilter === 'OUT_OF_STOCK') statusMatch = product.quantity === 0 && product.status !== 'PENDING_PRICE';
       if (statusFilter === 'PENDING') statusMatch = product.status === 'PENDING_PRICE';
-      return nameMatch && catMatch && statusMatch;
+      return nameMatch && catMatch && brandMatch && statusMatch;
     });
-  }, [products, searchQuery, selectedCategory, statusFilter, unitMatches]);
+  }, [products, searchQuery, selectedCategory, selectedBrand, statusFilter, unitMatches]);
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  useEffect(() => setCurrentPage(1), [searchQuery, selectedCategory, statusFilter, currentShop?.id]);
+  useEffect(() => setCurrentPage(1), [searchQuery, selectedCategory, selectedBrand, statusFilter, currentShop?.id]);
+  useEffect(() => setSelectedBrand('ALL'), [currentShop?.id]);
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
   const pendingCount = products.filter(p => p.status === 'PENDING_PRICE').length;
@@ -158,7 +176,7 @@ export function CatalogManagementPage() {
           <button 
             type="button"
             aria-pressed={selectedCategory === 'ALL'}
-            onClick={() => setSelectedCategory('ALL')}
+            onClick={() => { setSelectedCategory('ALL'); setSelectedBrand('ALL'); }}
             style={{ padding: '8px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', border: selectedCategory === 'ALL' ? 'none' : '1px solid var(--border-color)', backgroundColor: selectedCategory === 'ALL' ? BRAND : 'var(--bg-surface)', color: selectedCategory === 'ALL' ? '#fff' : 'var(--text-primary)' }}
           >
             Tous
@@ -168,13 +186,23 @@ export function CatalogManagementPage() {
               key={c.id}
               type="button"
               aria-pressed={selectedCategory === c.id}
-              onClick={() => setSelectedCategory(c.id)}
+              onClick={() => { setSelectedCategory(c.id); setSelectedBrand('ALL'); }}
               style={{ padding: '8px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', border: selectedCategory === c.id ? 'none' : '1px solid var(--border-color)', backgroundColor: selectedCategory === c.id ? BRAND : 'var(--bg-surface)', color: selectedCategory === c.id ? '#fff' : 'var(--text-primary)' }}
             >
               {c.name}
             </button>
           ))}
         </div>
+        {brands.length > 0 && <div className="catalog-brand-shortcuts" role="group" aria-label="Marques de cette catégorie">
+          <span className="catalog-brand-label">Marques</span>
+          <button type="button" aria-pressed={selectedBrand === 'ALL'} onClick={() => setSelectedBrand('ALL')}>Toutes</button>
+          {brands.map(brand => <button
+            key={brand.key}
+            type="button"
+            aria-pressed={selectedBrand === brand.key}
+            onClick={() => setSelectedBrand(brand.key)}
+          >{brand.name} <small>{brand.count}</small></button>)}
+        </div>}
       </div>
 
       {/* Product results */}
