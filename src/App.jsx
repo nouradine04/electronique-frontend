@@ -149,9 +149,7 @@ function MainAppContent() {
           setActiveTab(tab);
           setIsMobileMenuOpen(false); // Auto-close on mobile
         }}
-        onLogout={handleLogout}
         isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
       {/* Main Content Area */}
@@ -230,7 +228,6 @@ function MainAppContent() {
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onLogout={handleLogout}
       />
     </div>
   );

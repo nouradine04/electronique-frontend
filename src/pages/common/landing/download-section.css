@@ -1,0 +1,11 @@
+.landing-download { position: relative; isolation: isolate; overflow: hidden; border-block: 1px solid var(--border-color); background: linear-gradient(135deg, var(--bg-main), color-mix(in srgb, #dceefa 55%, var(--bg-main))); }
+.landing-download::before { position: absolute; z-index: -1; inset: -40% auto auto -16%; width: 650px; height: 650px; border-radius: 50%; background: radial-gradient(circle, rgba(42, 148, 220, .16), transparent 70%); pointer-events: none; content: ''; }
+.landing-download-inner { width: min(1120px, 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: clamp(28px, 5vw, 70px); }
+.landing-download-copy { max-width: 450px; text-align: start; }
+.landing-download-eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; color: #0e6ba8; font-size: 13px; font-weight: 800; }
+.landing-download-copy h2 { margin: 0; color: var(--text-primary); font-size: clamp(2.2rem, 4vw, 3.5rem); font-weight: 850; line-height: 1.08; }
+.landing-download-copy p { max-width: 390px; margin: 17px 0 0; color: var(--text-secondary); font-size: 1.04rem; line-height: 1.6; }
+[data-theme="dark"] .landing-download { background: linear-gradient(135deg, var(--bg-main), color-mix(in srgb, #103b61 28%, var(--bg-main))); }
+[data-theme="dark"] .landing-download-eyebrow { color: #76c8ff; }
+@media (max-width: 860px) { .landing-download-inner { grid-template-columns: 1fr; gap: 27px; } .landing-download-copy { max-width: 620px; margin: 0 auto; text-align: center; } .landing-download-copy p { margin-inline: auto; } .install-options { margin-inline: auto; } }
+@media (max-width: 520px) { .landing-download-copy h2 { font-size: 1.85rem; } .landing-download-copy p { margin-top: 10px; font-size: .92rem; } .landing-download-eyebrow { margin-bottom: 10px; } }

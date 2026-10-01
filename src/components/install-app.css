@@ -1,16 +1,21 @@
-.install-panel.install-designed { max-width: 700px; padding: 0; border: 0; background: transparent; }
-.install-choices { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
-.install-choices button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 66px; padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; font: inherit; font-size: 14px; }
-.install-choices button[aria-pressed=true] { color: #0e6ba8; border-color: #0e6ba8; box-shadow: inset 0 0 0 1px #0e6ba8; }
-.install-choices button:focus-visible { outline: 3px solid #0e6ba8; outline-offset: 3px; }
-.install-detail { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 18px; padding: 32px; }
-.install-symbol { display: inline-flex; padding: 14px; border-radius: 16px; background: rgba(14,107,168,.08); color: #0e6ba8; margin-bottom: 18px; }
-.install-detail h3 { font-size: 24px; letter-spacing: -.04em; margin: 0 0 10px; }
-.install-detail > small { color: var(--text-muted); font-size: 12px; }
-.install-detail p { max-width: 440px; margin: 16px auto; font-size: 14px; }
-.install-detail .btn { padding: 12px 24px; border-radius: 28px; min-height: 48px; margin-top: 6px; }
-.desktop-platform-choice { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; margin: -2px 0 14px; color: var(--text-muted); font-size: 12px; }
-.desktop-platform-choice button { min-height: 30px; padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-main); color: var(--text-secondary); font: inherit; font-weight: 700; cursor: pointer; }
-.desktop-platform-choice button[aria-pressed=true] { border-color: #0e6ba8; color: #0e6ba8; background: rgba(14,107,168,.08); }
-.install-detail [role=status] { text-align: start; background: var(--bg-main); padding: 14px; border-radius: 10px; }
-@media(max-width:600px) { .install-detail { padding: 24px 18px; } .install-detail h3 { font-size: 22px; } .install-choices { gap: 6px; } .install-choices button { flex-direction: column; font-size: 11px; gap: 7px; padding-inline: 4px; } .install-detail .btn { width: 100%; justify-content: center; } }
+.install-options { width: 100%; max-width: 530px; padding: 20px; display: grid; gap: 15px; border: 1px solid rgba(14, 107, 168, .14); border-radius: 21px; background: var(--bg-surface); box-shadow: 0 16px 42px rgba(16, 50, 82, .08); }
+.install-device-list { display: grid; gap: 10px; }
+.install-device { width: 100%; min-height: 58px; padding: 12px 17px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid var(--border-color); border-radius: 11px; color: var(--text-primary); background: var(--bg-main); cursor: pointer; font: inherit; font-size: 15px; font-weight: 700; text-align: start; transition: border-color .18s ease, background .18s ease; }
+.install-device:hover { border-color: #0e6ba8; }
+.install-device[aria-pressed="true"] { border-color: #0e6ba8; color: #0e6ba8; background: rgba(14, 107, 168, .07); }
+.install-device-indicator { width: 18px; height: 18px; flex: 0 0 auto; border: 1.5px solid color-mix(in srgb, var(--text-secondary) 65%, transparent); border-radius: 50%; background: var(--bg-surface); }
+.install-device[aria-pressed="true"] .install-device-indicator { border: 5px solid #0e6ba8; }
+.install-primary { width: 100%; min-height: 54px; padding: 11px 19px; border: 0; border-radius: 11px; color: #fff; background: #0e6ba8; box-shadow: 0 8px 19px rgba(14, 107, 168, .2); cursor: pointer; font: inherit; font-size: 15px; font-weight: 750; text-align: center; }
+.install-primary:hover { background: #09598e; }
+.install-device:focus-visible, .install-primary:focus-visible { outline: 2px solid #0e6ba8; outline-offset: 3px; }
+.install-option-message { margin: 0; padding: 11px 13px; border-radius: 9px; color: var(--text-secondary); background: var(--bg-main); font-size: 13px; line-height: 1.45; }
+[data-theme="dark"] .install-device[aria-pressed="true"] { color: #76c8ff; background: rgba(14, 107, 168, .18); }
+[data-theme="dark"] .install-device[aria-pressed="true"] .install-device-indicator { border-color: #76c8ff; }
+@media (max-width: 860px) { .install-options { margin-inline: auto; } }
+@media (max-width: 520px) {
+  .install-options { padding: 14px; gap: 12px; border-radius: 17px; }
+  .install-device-list { gap: 9px; }
+  .install-device { min-height: 55px; padding: 11px 14px; font-size: 14px; }
+  .install-primary { min-height: 50px; font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .install-device { transition: none; } }

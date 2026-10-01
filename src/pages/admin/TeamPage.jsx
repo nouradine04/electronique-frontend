@@ -98,7 +98,7 @@ export function TeamPage() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ margin: '0 0 6px', fontSize: '24px', color: 'var(--text-primary)' }}>Équipe et accès</h1>
+          <h1 style={{ margin: '0 0 6px', fontSize: '24px', color: 'var(--text-primary)' }}>Utilisateurs et accès</h1>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '14px' }}>
             Gérez les gestionnaires et employés autorisés à travailler dans {currentShop.name}.
           </p>

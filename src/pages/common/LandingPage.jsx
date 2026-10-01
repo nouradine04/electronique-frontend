@@ -3,20 +3,21 @@ import { LandingStyles } from './landing/LandingStyles';
 import { ContactSection } from './landing/ContactSection';
 import { BenefitsSection } from './landing/BenefitsSection';
 import { FeaturesSection } from './landing/FeaturesSection';
+import { DownloadSection } from './landing/DownloadSection';
 import { PricingSection } from './landing/PricingSection';
+import { LandingFooter } from './landing/LandingFooter';
 import { FaqSection } from './landing/FaqSection';
 import { RegistrationModal } from './landing/RegistrationModal';
 
 import { LandingHero } from '../../components/LandingHero';
+import { LandingDashboardShowcase } from '../../components/LandingDashboardShowcase';
 
 import { LandingNavbar } from '../../components/LandingNavbar';
 
-import { InstallApp } from '../../components/InstallApp';
 import './public-responsive.css';
 import './landing-flow.css';
 
-import { ArrowRight, ArrowUp, Store } from 'lucide-react';
-import logoImg from '../../assets/logo.png';
+import { ArrowRight, ArrowUp } from 'lucide-react';
 
 export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing', appOnly = false }) {
   const {
@@ -52,6 +53,16 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
     loading,
   } = useLandingPage({ onLoginSuccess, onNavigate, initialView, appOnly });
 
+  const goToSection = (section) => {
+    if (section === 'contact') {
+      setCurrentView('contact');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setCurrentView('landing');
+    window.setTimeout(() => scrollToSection(section), 100);
+  };
+
   return (
     <div className={appOnly ? "installed-auth" : undefined} style={{
       minHeight: '100vh',
@@ -61,7 +72,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
       display: 'flex',
       flexDirection: 'column',
       scrollBehavior: 'smooth',
-      overflowX: 'hidden',
+      overflowX: 'clip',
       maxWidth: '100%'
     }}>
       
@@ -71,7 +82,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
 
       <LandingNavbar isRtl={isRtl} language={currentLang} theme={theme}
         onHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-        onSection={(section) => { if (section === 'contact') setCurrentView('contact'); else { setCurrentView('landing'); setTimeout(() => scrollToSection(section), 100); } }}
+        onSection={goToSection}
         onLogin={() => onNavigate('login')} onRegister={() => openRegistration('standard')}
         onLanguage={toggleLanguage} onTheme={toggleTheme} />
 
@@ -84,6 +95,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
         ) : (
           <>
             <LandingHero isRtl={isRtl} onStart={() => openRegistration('standard')} />
+            <LandingDashboardShowcase isRtl={isRtl} />
 
         {/* PAIN POINTS SECTION */}
         <BenefitsSection isRtl={isRtl} lt={lt} scrollToSection={scrollToSection} />
@@ -92,20 +104,7 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
         <FeaturesSection isRtl={isRtl} />
 
         {/* DOWNLOAD SECTION */}
-        <section id="download" className="landing-section" style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '2.2rem', fontWeight: '800', marginBottom: '16px' }}>
-              {isRtl ? "تحميل التطبيق" : "Télécharger NStock"}
-            </h2>
-            <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '48px', maxWidth: '700px', margin: '0 auto' }}>
-              {isRtl 
-                ? "NStock متوفر على جميع أجهزتك. احصل عليه الآن واحتفظ بأيقونة التطبيق بين تطبيقاتك المفضلة." 
-                : "NStock est disponible sur tous vos appareils. Installez-le dès maintenant et retrouvez son icône parmi toutes vos autres applications."}
-            </p>
-
-            <InstallApp isRtl={isRtl} />
-          </div>
-        </section>
+        <DownloadSection isRtl={isRtl} />
 
         {/* PRICING SECTION */}
         <PricingSection setPricingPeriod={setPricingPeriod} pricingPeriod={pricingPeriod} openRegistration={openRegistration} />
@@ -115,13 +114,12 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
 
         <section className="landing-final-cta" aria-labelledby="landing-final-title">
           <div className="landing-final-card">
-            <div className="landing-final-copy">
-              <span className="landing-final-icon" aria-hidden="true"><Store size={25} /></span>
-              <h2 id="landing-final-title">Prêt à gérer votre boutique ?</h2>
-            </div>
-            <div className="landing-final-actions">
-              <button type="button" className="landing-final-primary" onClick={() => openRegistration('standard')}>Créer ma boutique <ArrowRight size={18} /></button>
-            </div>
+            <span className="landing-final-eyebrow">{isRtl ? 'ابدأ الآن' : 'Commencer'}</span>
+            <h2 id="landing-final-title">{isRtl ? 'جاهز لإدارة متجرك؟' : 'Prêt à gérer votre boutique ?'}</h2>
+            <p>{isRtl ? 'مبيعاتك ومخزونك في مكان واحد.' : 'Vos ventes et votre stock, au même endroit.'}</p>
+            <button type="button" className="landing-final-primary" onClick={() => openRegistration('standard')}>
+              {isRtl ? 'إنشاء متجري' : 'Créer ma boutique'} <ArrowRight size={17} aria-hidden="true" />
+            </button>
           </div>
         </section>
       </>
@@ -129,19 +127,11 @@ export function LandingPage({ onLoginSuccess, onNavigate, initialView = 'landing
   </main>
 
       {/* Footer */}
-      <footer className="landing-footer">
-        <div className="landing-footer-main">
-          <button type="button" className="landing-footer-brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><img src={logoImg} alt="NStock" /><span>Caisse et gestion de stock pour boutiques d’électronique.</span></button>
-          <nav aria-label="Navigation du pied de page">
-            <button type="button" onClick={() => scrollToSection('features')}>Fonctionnalités</button>
-            <button type="button" onClick={() => scrollToSection('pricing')}>Abonnement</button>
-            <button type="button" onClick={() => scrollToSection('download')}>Installer</button>
-            <button type="button" onClick={() => setCurrentView('contact')}>Contact</button>
-          </nav>
-          <button type="button" className="landing-footer-login" onClick={() => onNavigate('login')}>Se connecter <ArrowRight size={16} /></button>
-        </div>
-        <div className="landing-footer-bottom"><span>&copy; {new Date().getFullYear()} NStock. Tous droits réservés.</span><span>Simple · sécurisé · disponible hors connexion</span></div>
-      </footer>
+      <LandingFooter
+        onHome={() => { setCurrentView('landing'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        onSection={goToSection}
+        onLogin={() => onNavigate('login')}
+      />
 
       {showBackToTop && <button type="button" className="landing-back-top" aria-label="Revenir en haut de la page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><ArrowUp size={20} /></button>}
 

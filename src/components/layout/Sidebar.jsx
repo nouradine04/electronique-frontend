@@ -6,7 +6,6 @@ import {
   ShoppingCart, 
   History, 
   Layers, 
-  LogOut, 
   PackagePlus, 
   ChevronLeft, 
   ChevronRight, 
@@ -20,7 +19,7 @@ import {
 import { BrandLogo } from '../BrandLogo';
 import './navigation.css';
 
-export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, setIsMobileMenuOpen }) {
+export function Sidebar({ activeTab, setActiveTab, isMobileMenuOpen }) {
   const { t } = useTranslation();
   const { currentShop, availableShops, switchShop, userRole, userName } = useShop();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -130,6 +129,10 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, s
 
           {/* Stock: accessible to both */}
           <NavItem id="inventory" icon={Layers} label={t('sidebar.stock')} />
+
+          {userRole === 'owner' && (
+            <NavItem id="add" icon={PackagePlus} label={t('sidebar.products')} />
+          )}
           
           {userRole === 'owner' ? (
             <NavItem id="transactions" icon={History} label={t('sidebar.transactions')} />
@@ -172,32 +175,6 @@ export function Sidebar({ activeTab, setActiveTab, onLogout, isMobileMenuOpen, s
 
       <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border-color)' }}>
         
-        {/* Logout Button (styled as NavItem for perfect alignment) */}
-        <button
-          onClick={onLogout}
-          className="sidebar-logout"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            width: '100%',
-            padding: '12px 24px',
-            border: 'none',
-            backgroundColor: 'transparent',
-            color: 'var(--text-primary)',
-            fontWeight: 500,
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-            textAlign: 'left',
-            transition: 'all 0.2s ease'
-          }}
-          title={t('sidebar.logout')}
-        >
-          <div style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', flexShrink: 0 }}>
-            <LogOut size={20} strokeWidth={2} />
-          </div>
-          <span className="sidebar-text" style={{ color: 'var(--danger)' }}>{t('sidebar.logout')}</span>
-        </button>
-
         {/* Collapse Toggle */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}

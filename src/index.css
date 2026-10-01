@@ -72,7 +72,7 @@
 
 html, body {
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 html.installed-app,
@@ -339,8 +339,6 @@ button, input, select, textarea {
   .bottom-profile > span:last-child { min-width: 0; display: grid; gap: 2px; }
   .bottom-profile strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
   .bottom-profile small { color: var(--text-muted); font-size: 11px; }
-  .bottom-logout { width: calc(100% - 12px); min-height: 46px; margin: 8px 6px 4px; padding: 0 14px; display: flex; align-items: center; gap: 12px; border: 0; border-top: 1px solid var(--border-color); background: transparent; color: var(--danger); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-
   .bottom-nav-item {
     display: flex;
     flex-direction: column;
@@ -785,35 +783,6 @@ button, input, select, textarea {
 @media (max-width: 480px) {
   .catalog-card-stock {
     font-size: 0.68rem !important;
-  }
-}
-
-/* Billing Toggle Switcher */
-.billing-switcher {
-  display: inline-flex;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  padding: 4px;
-  border-radius: 30px;
-  margin-bottom: 40px;
-  gap: 4px;
-  max-width: 100%;
-}
-
-@media (max-width: 480px) {
-  .billing-switcher {
-    display: flex !important;
-    flex-direction: column !important;
-    border-radius: 12px !important;
-    width: 100% !important;
-    max-width: 280px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-  .billing-switcher button {
-    border-radius: 8px !important;
-    justify-content: center !important;
-    width: 100% !important;
   }
 }
 

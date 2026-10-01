@@ -164,7 +164,7 @@ export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
         {/* Right Controls */}
         <div className="app-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
 
-          <button type="button" className="header-logout" onClick={onLogout}><LogOut size={18} aria-hidden="true" /><span>Déconnexion</span></button>
+          <button type="button" className="header-logout" onClick={onLogout} aria-label={t('sidebar.logout')} title={t('sidebar.logout')}><LogOut size={20} aria-hidden="true" /></button>
 
           {/* Language Toggle */}
           <button

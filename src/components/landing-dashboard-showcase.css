@@ -1,0 +1,99 @@
+.landing-dashboard-showcase {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(68px, 8vw, 112px) clamp(18px, 5vw, 64px);
+  background: #080d14;
+}
+
+.landing-dashboard-glow {
+  position: absolute;
+  z-index: 0;
+  top: 2%;
+  left: 50%;
+  width: min(1260px, 145vw);
+  height: 98%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 46%, rgba(165, 224, 255, .94) 0%, rgba(69, 178, 246, .78) 30%, rgba(22, 105, 177, .42) 58%, rgba(8, 13, 20, 0) 83%);
+  filter: blur(26px);
+}
+
+.landing-dashboard-stage {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.landing-dashboard-window {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 2294 / 1194;
+  border: 1px solid rgba(149, 205, 237, .24);
+  border-radius: 20px;
+  background: #0e1729;
+  box-shadow: 0 32px 78px rgba(0, 0, 0, .34), 0 0 90px rgba(79, 174, 234, .4);
+}
+
+.landing-dashboard-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transform: scale(1.015);
+  transition: opacity .7s ease, transform .7s ease;
+}
+.landing-dashboard-image.is-active { opacity: 1; transform: scale(1); }
+
+.landing-dashboard-switcher {
+  position: absolute;
+  z-index: 2;
+  bottom: 12px;
+  left: 50%;
+  padding: 3px 5px;
+  display: flex;
+  align-items: center;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 99px;
+  background: rgba(15, 26, 42, .72);
+  backdrop-filter: blur(8px);
+}
+.landing-dashboard-switcher button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; }
+.landing-dashboard-switcher button::before { content: ''; width: 7px; height: 7px; border-radius: 99px; background: rgba(255, 255, 255, .58); transition: width .25s ease, background-color .25s ease; }
+.landing-dashboard-switcher button.is-active::before { width: 20px; background: #7bc7ff; }
+.landing-dashboard-switcher button:focus-visible { outline: 2px solid #7bc7ff; outline-offset: 1px; border-radius: 50%; }
+
+.landing-dashboard-expand {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 12px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(14, 107, 168, .23);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .94);
+  color: #0e6ba8;
+  box-shadow: 0 4px 14px rgba(15, 45, 72, .15);
+}
+.landing-dashboard-expand:focus-visible { outline: 3px solid #0e6ba8; outline-offset: 3px; }
+
+@media (max-width: 650px) {
+  .landing-dashboard-showcase { padding: 58px 14px 66px; }
+  .landing-dashboard-glow { top: 0; width: 195vw; height: 100%; filter: blur(18px); }
+  .landing-dashboard-window { border-radius: 14px; box-shadow: 0 20px 52px rgba(0, 0, 0, .34), 0 0 48px rgba(78, 184, 243, .38); }
+  .landing-dashboard-switcher { bottom: 7px; }
+  .landing-dashboard-expand { right: 7px; bottom: 7px; width: 34px; height: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-dashboard-image,
+  .landing-dashboard-switcher button::before { transition: none; }
+}

@@ -20,7 +20,19 @@ const { acknowledgeVersions } = await import('data:text/javascript;base64,' + Bu
 const legacyStockSource = fs.readFileSync(new URL('../src/services/legacyMovementCosts.ts', import.meta.url), 'utf8');
 const legacyStockJs = ts.transpileModule(legacyStockSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const { completeLegacyMovementCosts } = await import('data:text/javascript;base64,' + Buffer.from(legacyStockJs).toString('base64'));
+const diagnosticSource = fs.readFileSync(new URL('../src/services/syncOperationDiagnostic.ts', import.meta.url), 'utf8');
+const diagnosticJs = ts.transpileModule(diagnosticSource, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const { describeSyncFailure, syncFailureMessage } = await import('data:text/javascript;base64,' + Buffer.from(diagnosticJs).toString('base64'));
 const { markLocalChangesAsSynced } = require('@nozbe/watermelondb/sync/impl');
+
+test('sync rejection keeps a useful cause and operation reference without exposing a payload', () => {
+  const failure = { status: 400, details: { code: 'SYNC_VALIDATION', table: 'stock_movements',
+    issues: [{ message: 'unit_cost : champ obligatoire' }] } };
+  const diagnostic = describeSyncFailure(failure, 'operation-1');
+  assert.deepEqual(diagnostic, { operationId: 'operation-1', status: 400, code: 'SYNC_VALIDATION',
+    table: 'stock_movements', field: 'unit_cost' });
+  assert.equal(syncFailureMessage(diagnostic), 'Coût d’achat manquant dans une opération de stock.');
+});
 
 test('old initial stock operation recovers its cost without changing unrelated movements', () => {
   const product = { id: 'phone-1', unit_cost: 75000 };

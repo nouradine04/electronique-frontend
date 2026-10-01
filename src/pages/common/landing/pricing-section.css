@@ -1,0 +1,34 @@
+.landing-pricing { background: var(--bg-surface); }
+.landing-pricing-inner { width: min(1040px, 100%); margin: 0 auto; }
+.landing-pricing-intro { max-width: 650px; margin: 0 auto; text-align: center; }
+.landing-pricing-intro h2 { margin: 0; color: var(--text-primary); font-size: clamp(2.2rem, 4vw, 3.35rem); font-weight: 850; }
+.landing-pricing-intro p { margin: 18px 0 0; color: var(--text-secondary); font-size: 1.08rem; line-height: 1.55; }
+.billing-switcher { width: fit-content; max-width: 100%; margin: 35px auto 35px; padding: 5px; display: flex; gap: 3px; border: 1px solid var(--border-color); border-radius: 13px; background: var(--bg-main); }
+.billing-switcher button { min-height: 40px; padding: 8px 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 9px; color: var(--text-secondary); background: transparent; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; }
+.billing-switcher button[aria-pressed="true"] { color: #fff; background: #0e6ba8; box-shadow: 0 4px 12px rgba(14, 107, 168, .18); }
+.billing-switcher small { padding: 2px 5px; border-radius: 5px; color: #0e6ba8; background: rgba(14, 107, 168, .1); font-size: 10px; font-weight: 800; white-space: nowrap; }
+.billing-switcher button[aria-pressed="true"] small { color: #0e6ba8; background: #fff; }
+.pricing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 22px; }
+.pricing-card { min-width: 0; padding: 31px; display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 20px; background: var(--bg-main); box-shadow: 0 14px 38px rgba(16, 50, 82, .06); text-align: start; }
+.pricing-card-featured { border-color: rgba(14, 107, 168, .55); background: color-mix(in srgb, var(--bg-surface) 91%, #dbeeff); box-shadow: 0 20px 44px rgba(14, 107, 168, .1); }
+.pricing-card-heading { min-height: 69px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pricing-card h3 { margin: 0; color: var(--text-primary); font-size: 21px; font-weight: 800; }
+.pricing-card-heading p { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; }
+.pricing-featured-label { flex-shrink: 0; padding: 6px 9px; border-radius: 7px; color: #0e6ba8; background: rgba(14, 107, 168, .1); font-size: 10px; font-weight: 800; }
+.pricing-amount { margin-top: 28px; display: flex; align-items: baseline; gap: 8px; color: var(--text-primary); }
+.pricing-amount strong { font-size: clamp(2.1rem, 4vw, 3rem); font-weight: 850; letter-spacing: -.05em; line-height: 1; white-space: nowrap; }
+.pricing-amount > span { color: #0e6ba8; font-size: 14px; font-weight: 800; white-space: nowrap; }
+.pricing-amount small { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.pricing-billing-note { min-height: 18px; margin: 10px 0 0; color: var(--text-muted); font-size: 12px; }
+.pricing-separator { height: 1px; margin: 25px 0; background: var(--border-color); }
+.pricing-card ul { margin: 0 0 29px; padding: 0; display: grid; gap: 14px; list-style: none; }
+.pricing-card li { display: flex; align-items: flex-start; gap: 10px; color: var(--text-primary); font-size: 13px; line-height: 1.4; }
+.pricing-card li svg { flex: 0 0 auto; margin-top: 1px; color: #0e6ba8; }
+.pricing-action { width: 100%; min-height: 47px; margin-top: auto; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 9px; border: 1px solid #0e6ba8; border-radius: 10px; color: #0e6ba8; background: transparent; cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; }
+.pricing-card-featured .pricing-action { color: #fff; background: #0e6ba8; }
+.pricing-action:hover { box-shadow: 0 8px 20px rgba(14, 107, 168, .13); }
+.billing-switcher button:focus-visible, .pricing-action:focus-visible { outline: 2px solid #0e6ba8; outline-offset: 3px; }
+[data-theme="dark"] .pricing-amount > span, [data-theme="dark"] .pricing-featured-label, [data-theme="dark"] .pricing-action { color: #76c8ff; }
+[data-theme="dark"] .pricing-card-featured .pricing-action { color: #fff; }
+@media (max-width: 720px) { .pricing-grid { grid-template-columns: 1fr; gap: 16px; } .pricing-card { padding: 26px; } .pricing-card-heading { min-height: 0; } .pricing-amount { margin-top: 24px; } }
+@media (max-width: 520px) { .landing-pricing-intro p { font-size: .96rem; } .billing-switcher { width: 100%; margin-block: 27px; } .billing-switcher button { flex: 1; min-width: 0; min-height: 48px; padding: 6px 3px; flex-direction: column; gap: 2px; font-size: 12px; } .pricing-card { padding: 23px; border-radius: 17px; } .pricing-card h3 { font-size: 19px; } .pricing-amount strong { font-size: 2.3rem; } .pricing-amount > span { font-size: 12px; } .pricing-card ul { gap: 11px; } }

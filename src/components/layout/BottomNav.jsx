@@ -15,13 +15,12 @@ import {
   ShieldCheck,
   MoreHorizontal,
   X,
-  LogOut,
   UserRound
 } from 'lucide-react';
 
 const BRAND = '#0e6ba8';
 
-export function BottomNav({ activeTab, setActiveTab, onLogout }) {
+export function BottomNav({ activeTab, setActiveTab }) {
   const { t } = useTranslation();
   const { userRole, userName } = useShop();
   const [showMore, setShowMore] = useState(false);
@@ -54,6 +53,7 @@ export function BottomNav({ activeTab, setActiveTab, onLogout }) {
     { id: 'inventory', icon: Layers, label: t('bottom_nav.stock') },
   ];
   const ownerMoreTabs = [
+    { id: 'add', icon: PackagePlus, label: t('bottom_nav.products') },
     { id: 'transactions', icon: History, label: t('bottom_nav.transactions') },
     { id: 'invoices', icon: FileText, label: t('bottom_nav.invoices') },
     { id: 'profit', icon: TrendingUp, label: t('bottom_nav.profit') },
@@ -99,7 +99,6 @@ export function BottomNav({ activeTab, setActiveTab, onLogout }) {
             {moreTabs.map(tab => (
               <NavItem key={tab.id} id={tab.id} icon={tab.icon} label={tab.label} isBig />
             ))}
-            <button type="button" className="bottom-logout" onClick={() => { setShowMore(false); onLogout?.(); }}><LogOut size={20} /><span>Se déconnecter</span></button>
           </div>
         </div>
       )}

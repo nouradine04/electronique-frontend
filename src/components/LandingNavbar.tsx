@@ -12,11 +12,18 @@ type Props = {
 
 export function LandingNavbar(props: Props) {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLElement>(null);
   const ar = props.isRtl;
   const preferences = (className: string) => <div className={`public-preferences ${className}`}><button onClick={props.onLanguage} aria-label="Changer la langue"><Globe size={16} /><span>{props.language.toUpperCase()}</span></button><button onClick={props.onTheme} aria-label={props.theme === 'light' ? 'Activer le mode nuit' : 'Activer le mode clair'}>{props.theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}</button></div>;
   const links = [['features', ar ? 'المميزات' : 'Fonctionnalités'], ['pricing', ar ? 'الاشتراكات' : 'Tarifs'], ['download', ar ? 'التثبيت' : 'Installer'], ['contact', ar ? 'تواصل معنا' : 'Contact']];
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 20);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); toggle.current?.focus(); } };
@@ -25,7 +32,7 @@ export function LandingNavbar(props: Props) {
     document.addEventListener('pointerdown', outside);
     return () => { document.removeEventListener('keydown', close); document.removeEventListener('pointerdown', outside); };
   }, [open]);
-  return <header className="public-nav" ref={root} dir={ar ? 'rtl' : 'ltr'}>
+  return <header className={`public-nav${scrolled ? ' is-scrolled' : ''}${open ? ' menu-open' : ''}`} ref={root} dir={ar ? 'rtl' : 'ltr'}>
     <div className="public-nav-inner">
       <button className="public-brand" aria-label={ar ? 'الصفحة الرئيسية' : 'Accueil'} onClick={() => { setOpen(false); props.onHome(); }}><img src={logo} alt="NStock" /></button>
       <nav className="public-desktop-links" aria-label={ar ? 'التنقل الرئيسي' : 'Navigation principale'}>{links.map(([id, label]) => <button key={id} onClick={() => props.onSection(id)}>{label}</button>)}</nav>

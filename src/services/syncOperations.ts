@@ -5,6 +5,7 @@ import { requestJson } from './apiClient';
 import type { OperationPayload } from './operationQueue';
 import type { PushChangesResponse } from '../models/sync';
 import { completeLegacyMovementCosts } from './legacyMovementCosts';
+import { describeSyncFailure, syncFailureMessage } from './syncOperationDiagnostic';
 
 const raw = (record: Model) => record._raw as unknown as Record<string, any>;
 
@@ -38,8 +39,9 @@ export async function pushPendingOperations(shopId: string, retryBlocked = false
         baseVersions[table][snapshot.id] = Number(raw(record).version) || 0;
       }
     }
-    const send = (changes: OperationPayload['changes']) => requestJson<PushChangesResponse>(`/sync/operations?shopId=${encodeURIComponent(shopId)}`, {
-      method: 'POST', body: JSON.stringify({ id: operation.id, kind: payload.kind || 'checkout', stock_before: payload.stock_before, changes, base_versions: baseVersions }),
+    const send = (changes: OperationPayload['changes'], repaired = false) => requestJson<PushChangesResponse>(`/sync/operations?shopId=${encodeURIComponent(shopId)}`, {
+      method: 'POST', body: JSON.stringify({ id: operation.id, kind: payload.kind || 'checkout', stock_before: payload.stock_before, changes, base_versions: baseVersions,
+        ...(repaired ? { diagnostic_repair: 'missing_unit_cost' } : {}) }),
     });
     let ack: PushChangesResponse | undefined;
     try {
@@ -51,13 +53,15 @@ export async function pushPendingOperations(shopId: string, retryBlocked = false
       if (error.status === 400 && details?.code === 'SYNC_VALIDATION' && details.table === 'stock_movements') {
         const repaired = completeLegacyMovementCosts(payload);
         if (repaired !== payload.changes) {
-          try { ack = await send(repaired); }
+          try { ack = await send(repaired, true); }
           catch (retryError) { error = retryError; }
         }
       }
       if (!ack) {
+        const diagnostic = describeSyncFailure(error, operation.id);
+        console.error('[Sync] Opération refusée', diagnostic);
         if (![400, 403, 409].includes(error.status)) throw error;
-        await database.write(() => operation.update(item => { raw(item).state = 'blocked'; raw(item).error = String(error.message); }));
+        await database.write(() => operation.update(item => { raw(item).state = 'blocked'; raw(item).error = syncFailureMessage(diagnostic); }));
         continue;
       }
     }
@@ -68,8 +72,9 @@ export async function pushPendingOperations(shopId: string, retryBlocked = false
     // Only the local delivery journal is deleted, after the server confirmation.
     await database.write(async () => { await database.batch(operation.prepareDestroyPermanently(), ...links.map(link => link.prepareDestroyPermanently())); });
   }
-  const blocked = await collection.query(...scope, Q.where('state', 'blocked')).fetchCount();
-  return { blocked, remaining: await collection.query(...scope).fetchCount() };
+  const blockedRecords = await collection.query(...scope, Q.where('state', 'blocked')).fetch();
+  const errors = [...new Set(blockedRecords.map(record => String(raw(record).error || '')).filter(Boolean))];
+  return { blocked: blockedRecords.length, errors, remaining: await collection.query(...scope).fetchCount() };
 }
 
 export function pendingOperationCount(shopId: string) {

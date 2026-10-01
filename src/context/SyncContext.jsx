@@ -343,16 +343,14 @@ export function SyncProvider({ children }) {
 
       setLastSyncedAt(new Date());
       const held = Object.values(excluded).reduce((count, ids) => count + ids.length, 0);
-      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) non acceptée(s) par le serveur. Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : '');
+      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) à vérifier. ${operationState.errors[0] || ''} Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : '');
       schedule.lastSuccess = Date.now();
       schedule.failures = 0;
       schedule.retryAt = 0;
       await refreshPendingCount();
 
     } catch (err) {
-      if (err.status === 409) {
-        setSyncError(err.message);
-      }
+      setSyncError(err.status === 409 ? 'Conflit de synchronisation. Les données restent sur cet appareil.' : 'Synchronisation interrompue. Les données restent sur cet appareil et un nouvel essai sera fait automatiquement.');
       syncSchedule.current.failures += 1;
       syncSchedule.current.retryAt = Date.now() + jitteredRetryDelay(syncSchedule.current.failures);
       console.warn('[Sync] Échec — données conservées localement:', err.message);
