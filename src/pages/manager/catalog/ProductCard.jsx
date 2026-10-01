@@ -2,7 +2,7 @@ import { Package } from 'lucide-react';
 import { LocalImage } from '../../../components/common/LocalImage.jsx';
 import './product-card.css';
 
-export function ProductCard({ product, categoryName, onOpen }) {
+export function ProductCard({ product, categoryName, onOpen, view = 'grid' }) {
   const quantity = Number(product.quantity || 0);
   const minimum = Number(product.minStock ?? 5);
   const pending = product.status === 'PENDING_PRICE';
@@ -14,7 +14,8 @@ export function ProductCard({ product, categoryName, onOpen }) {
         ? { label: 'Stock bas', tone: 'low' }
         : { label: 'En stock', tone: 'available' };
 
-  return <button type="button" className="product-tile" onClick={onOpen} aria-label={`Voir ${product.name}, ${status.label}`}>
+  return <button type="button" className={`product-tile product-tile--${view}`} onClick={onOpen} aria-label={`Voir ${product.name}, ${status.label}`}>
+    <span className="product-tile-marker" aria-hidden="true" />
     <span className="product-tile-image">
       <LocalImage
         src={product.imageUrl || product.image_url}
@@ -24,13 +25,13 @@ export function ProductCard({ product, categoryName, onOpen }) {
       />
     </span>
     <span className="product-tile-body">
-      <span className="product-tile-category">{categoryName || 'Sans catégorie'}</span>
       <strong className="product-tile-name">{product.name}</strong>
+      <span className="product-tile-category">{categoryName || 'Sans catégorie'}</span>
       <span className="product-tile-bottom">
         <strong className="product-tile-price">{pending ? 'Prix à définir' : `${Number(product.price || 0).toLocaleString('fr-FR')} FCFA`}</strong>
         <span className="product-tile-quantity">{quantity} unité{quantity > 1 ? 's' : ''}</span>
       </span>
-      <span className={`product-tile-badge ${status.tone}`}>{status.label}</span>
     </span>
+    <span className={`product-tile-badge ${status.tone}`}>{status.label}</span>
   </button>;
 }

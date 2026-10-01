@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { queryCategories, queryProducts, createProduct, createCategory, updateProduct } from '../../db/queries.js';
 import { recordStockMovement } from '../../services/syncEngine.js';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
-import { Search, Plus, Package } from 'lucide-react';
+import { Search, Plus, Package, LayoutGrid, List } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProductCard } from './catalog/ProductCard.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
@@ -27,6 +27,8 @@ export function CatalogManagementPage() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [catName, setCatName] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [view, setView] = useState('grid');
 
   const BRAND = '#0e6ba8';
 
@@ -89,7 +91,6 @@ export function CatalogManagementPage() {
       return unitMatches.has(product.id) || (nameMatch && catMatch && statusMatch);
     });
   }, [products, searchQuery, selectedCategory, statusFilter, unitMatches]);
-  const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   useEffect(() => setCurrentPage(1), [searchQuery, selectedCategory, statusFilter, currentShop?.id]);
@@ -172,23 +173,42 @@ export function CatalogManagementPage() {
         </div>
       </div>
 
-      {/* Product Grid */}
+      {/* Product results */}
       {filteredProducts.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
           <Package size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
           <p style={{ margin: 0, fontWeight: 600 }}>Aucun produit trouvé</p>
         </div>
       ) : (
-        <div className="catalog-grid">
-          {paginatedProducts.map(product => <ProductCard
-            key={product.id}
-            product={product}
-            categoryName={categories.find(category => category.id === product.categoryId)?.name}
-            onOpen={() => setSelectedProductId(product.id)}
-          />)}
+        <div className="catalog-results">
+          <div className="catalog-viewbar">
+            <span className="catalog-viewbar-count">{filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''}</span>
+            <div className="catalog-viewbar-actions">
+              <div className="catalog-view-switch" role="group" aria-label="Affichage des produits">
+                <button type="button" aria-label="Afficher en grille" aria-pressed={view === 'grid'} onClick={() => setView('grid')}><LayoutGrid size={17} /></button>
+                <button type="button" aria-label="Afficher en liste" aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={18} /></button>
+              </div>
+              <label className="catalog-page-size">Afficher
+                <select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setCurrentPage(1); }}>
+                  <option value={8}>8</option>
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div className={view === 'grid' ? 'catalog-grid' : 'catalog-list'}>
+            {paginatedProducts.map(product => <ProductCard
+              key={product.id}
+              product={product}
+              categoryName={categories.find(category => category.id === product.categoryId)?.name}
+              view={view}
+              onOpen={() => setSelectedProductId(product.id)}
+            />)}
+          </div>
+          <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredProducts.length} itemLabel="produit" onPageChange={setCurrentPage} />
         </div>
       )}
-      <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredProducts.length} itemLabel="produit" onPageChange={setCurrentPage} />
 
       {/* Modals */}
       {showAddWizard && (
