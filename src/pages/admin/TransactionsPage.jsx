@@ -4,9 +4,11 @@ import { useShop } from '../../context/ShopContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { querySales, queryProducts, queryClients, queryReturns, processSaleReturn } from '../../db/queries.js';
 import { ReturnSaleModal } from '../../components/sales/ReturnSaleModal.jsx';
+import { LocalImage } from '../../components/common/LocalImage.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
-import { Search, Filter, Calendar, Banknote, Receipt, CreditCard, AlertCircle, Check, RotateCcw } from 'lucide-react';
+import { Search, Filter, Calendar, Banknote, Receipt, CreditCard, AlertCircle, Check, RotateCcw, Package } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import './transactions-list.css';
 
 export function TransactionsPage() {
   const { t } = useTranslation();
@@ -329,14 +331,17 @@ export function TransactionsPage() {
               const canReturn = Boolean(product) && isOwnSale && returnInfo.quantity < Number(sale.quantity || 0);
               const netAmount = Number(sale.totalPrice || 0) - Number(returnInfo.refund || 0);
               return (
-                <div key={sale.id || idx} className="tp-transaction-card">
+                <div key={sale.id || idx} className="tp-transaction-card tp-sale-card">
                   <div className="tp-transaction-main">
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '14px', lineHeight: 1.35, overflowWrap: 'anywhere' }}>{product?.name || 'Produit inconnu'}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Client : {client?.name || 'Anonyme'}</div>
+                    <div className="tp-sale-product">
+                      <span className="tp-sale-thumb"><LocalImage src={product?.imageUrl || product?.image_url} alt="" loading="lazy" fallback={<Package size={19} aria-hidden="true" />} /></span>
+                      <span className="tp-sale-product-copy">
+                        <strong>{product?.name || 'Produit inconnu'}</strong>
+                        <small>Client : {client?.name || 'Anonyme'}</small>
+                      </span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 800, color: '#0d6efd', fontSize: '15px', whiteSpace: 'nowrap' }}>{formatCurrency(netAmount)}</div>
+                      <div className="tp-sale-money">{formatCurrency(netAmount)}</div>
                       {returnInfo.refund > 0 && <div style={{ color: '#6c757d', fontSize: '11px', marginTop: '2px' }}>net retour</div>}
                     </div>
                   </div>
@@ -368,9 +373,9 @@ export function TransactionsPage() {
             })}
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tp-table">
-              <thead style={{ background: 'var(--bg-main)' }}>
+          <div className="tp-sales-scroll">
+            <table className="tp-table tp-sales-table">
+              <thead>
                 <tr>
                   <th>Produit</th>
                   <th>Client</th>
@@ -388,20 +393,24 @@ export function TransactionsPage() {
                   const client = allClients.find(c => c.id === sale.clientId);
                   const returnInfo = returnsBySale.get(sale.id) || { quantity: 0, refund: 0 };
                   const canReturn = Boolean(product) && canUserReturnSale(sale) && returnInfo.quantity < Number(sale.quantity || 0);
+                  const netAmount = Number(sale.totalPrice || 0) - Number(returnInfo.refund || 0);
                   return (
                     <tr key={sale.id || idx}>
-                      <td style={{ fontWeight: 500 }}>{product?.name || 'Produit inconnu'}</td>
+                      <td><span className="tp-sale-product">
+                        <span className="tp-sale-thumb"><LocalImage src={product?.imageUrl || product?.image_url} alt="" loading="lazy" fallback={<Package size={19} aria-hidden="true" />} /></span>
+                        <strong className="tp-sale-product-copy">{product?.name || 'Produit inconnu'}</strong>
+                      </span></td>
                       <td style={{ color: client ? 'var(--text-primary)' : 'var(--text-muted)', fontStyle: client ? 'normal' : 'italic' }}>
                         {client?.name || 'Anonyme'}
                       </td>
-                      <td>
+                      <td className="tp-sale-seller">
                         {sale.sellerName
                           ? <strong>{sale.sellerName}</strong>
                           : <span style={{ color: 'var(--text-muted)' }}>—</span>
                         }
                       </td>
                       <td>{sale.quantity}</td>
-                      <td style={{ fontWeight: 700 }}>{formatCurrency(sale.totalPrice)}</td>
+                      <td className="tp-sale-money">{formatCurrency(netAmount)}</td>
                       <td>
                         <span className={`badge ${getPaymentBadge(sale.paymentMethod)}`}>
                           {paymentLabels[sale.paymentMethod] || sale.paymentMethod}

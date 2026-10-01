@@ -8,7 +8,7 @@ import { recordStockMovement } from '../../services/syncEngine.js';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { Search, Plus, Package } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { LocalImage } from '../../components/common/LocalImage.jsx';
+import { ProductCard } from './catalog/ProductCard.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 
@@ -57,7 +57,7 @@ export function CatalogManagementPage() {
         return;
       }
       await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName });
-      showToast('Produit enregistré. L’administrateur fixera les prix.', 'success');
+      showToast(userRole === 'owner' ? 'Produit enregistré.' : 'Produit enregistré. L’administrateur fixera les prix.', 'success');
       setShowAddWizard(false);
     } catch (err) {
       throw err;
@@ -89,7 +89,7 @@ export function CatalogManagementPage() {
       return unitMatches.has(product.id) || (nameMatch && catMatch && statusMatch);
     });
   }, [products, searchQuery, selectedCategory, statusFilter, unitMatches]);
-  const pageSize = 10;
+  const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   useEffect(() => setCurrentPage(1), [searchQuery, selectedCategory, statusFilter, currentShop?.id]);
@@ -103,7 +103,7 @@ export function CatalogManagementPage() {
       
       {/* Header Row */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>Catalogue</h2>
+        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>Produits</h2>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button 
             onClick={() => setShowAddCategory(true)}
@@ -180,67 +180,12 @@ export function CatalogManagementPage() {
         </div>
       ) : (
         <div className="catalog-grid">
-          {paginatedProducts.map(product => {
-            const cat = categories.find(c => c.id === product.categoryId);
-            let badgeText = '';
-            let badgeBg = '';
-            let badgeColor = '#fff';
-            
-            const isPending = product.status === 'PENDING_PRICE';
-            if (isPending) {
-              badgeText = 'En attente'; badgeBg = '#c71f37';
-            } else if (product.quantity === 0) {
-              badgeText = 'Rupture'; badgeBg = 'var(--danger)';
-            } else if (product.quantity < product.minStock) {
-              badgeText = 'Stock bas'; badgeBg = '#c71f37';
-            } else {
-              badgeText = 'En stock'; badgeBg = 'var(--success)';
-            }
-
-            return (
-              <button type="button"
-                key={product.id} 
-                className="catalog-card"
-                onClick={() => setSelectedProductId(product.id)}
-                aria-label={`Ouvrir la fiche de ${product.name}`}
-                style={isPending ? {
-                  border: '2px solid #c71f37',
-                  backgroundColor: 'var(--bg-main)',
-                  opacity: 0.75,
-                  textAlign: 'left'
-                } : { textAlign: 'left' }}
-              >
-                <div className="catalog-card-image">
-                  {product.image_url ? (
-                    <LocalImage src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <Package size={32} color="var(--text-muted)" />
-                  )}
-                  <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '2px 8px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: badgeBg, color: badgeColor }}>
-                    {badgeText}
-                  </div>
-                </div>
-                <div className="catalog-card-info">
-                  <div className="catalog-card-name">
-                    {product.name}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {cat ? cat.name : 'Sans catégorie'}
-                  </div>
-                  <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
-                    {product.status === 'PENDING_PRICE' ? (
-                      <div style={{ color: '#c71f37', fontWeight: 600, fontSize: '0.85rem' }}>Prix non défini</div>
-                    ) : (
-                      <div className="catalog-card-price" style={{ color: BRAND }}>{Number(product.price).toLocaleString('fr-FR')} FCFA</div>
-                    )}
-                    <div className="catalog-card-stock">
-                      Stock: {product.quantity}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+          {paginatedProducts.map(product => <ProductCard
+            key={product.id}
+            product={product}
+            categoryName={categories.find(category => category.id === product.categoryId)?.name}
+            onOpen={() => setSelectedProductId(product.id)}
+          />)}
         </div>
       )}
       <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredProducts.length} itemLabel="produit" onPageChange={setCurrentPage} />
