@@ -129,12 +129,14 @@ test('real Watermelon: remote updates stay synced, replay is read-only, local ed
   const db = new Database({ adapter, modelClasses: [Product] });
   let flushes = 0;
   const apply = createRemoteChangesApplier(db, async () => { flushes++; });
-  const snapshot = quantity => ({ products: { created: [], updated: [{ id: 'phone1', name: 'Phone', quantity }], deleted: [] } });
+  const imageUrl = `https://api.example.test/media/shop/user/${'a'.repeat(64)}.webp`;
+  const snapshot = quantity => ({ products: { created: [], updated: [{ id: 'phone1', name: 'Phone', quantity, image_url: imageUrl }], deleted: [] } });
   await apply(snapshot(4));
   const product = await db.get('products').find('phone1');
   assert.equal(product._raw._status, 'synced');
   await apply(snapshot(5));
   assert.equal(product._raw.quantity, 5);
+  assert.equal(product._raw.image_url, imageUrl, 'a second device receives the product photo URL from the pull');
   assert.equal(product._raw._status, 'synced');
   assert.equal(product._raw._changed, '');
   const written = flushes;

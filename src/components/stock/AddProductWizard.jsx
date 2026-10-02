@@ -102,12 +102,16 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     }
   });
   const [imageError, setImageError] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const closeCamera = useCallback(() => setCameraOpen(false), []);
   const [step, setStep] = useState(1);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
+  const imageTaskRef = useRef(null);
+  const imageSelectionRef = useRef(0);
+  const imageValueRef = useRef(formData.image_url);
   const [customSpecs, setCustomSpecs] = useState(() => readCustomSpecs(initialData));
 
   useEffect(() => {
@@ -162,6 +166,13 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     };
     setCatalogOptions(options);
     const catalogImage = phone.imageUrl || phone.image_url || '';
+    if (catalogImage) {
+      imageSelectionRef.current += 1;
+      imageTaskRef.current = null;
+      imageValueRef.current = catalogImage;
+      setImageUploading(false);
+      setImageError('');
+    }
     setFormData(previous => ({
       ...previous,
       name: [brand, model].filter(Boolean).join(' '),
@@ -200,24 +211,40 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
 
   const storeImage = async file => {
     setImageError('');
-    try {
+    setImageUploading(true);
+    const selection = ++imageSelectionRef.current;
+    const task = (async () => {
       const reference = await saveLocalImage(file);
+      if (selection !== imageSelectionRef.current) return null;
+      imageValueRef.current = reference;
       setFormData(previous => ({ ...previous, image_url: reference }));
-      if (navigator.onLine && currentShop?.id) {
-        try {
-          const processedUrl = await uploadLocalImage(reference, currentShop.id);
-          setFormData(previous => previous.image_url === reference ? { ...previous, image_url: processedUrl } : previous);
-        } catch {
-          // The local photo remains durable and the normal sync will retry its upload.
-          setImageError('Photo conservée. Son fond sera retiré dès que le traitement sera disponible.');
+      if (!navigator.onLine || !currentShop?.id) return reference;
+      try {
+        const url = await uploadLocalImage(reference, currentShop.id);
+        if (selection === imageSelectionRef.current) {
+          imageValueRef.current = url;
+          setFormData(previous => previous.image_url === reference ? { ...previous, image_url: url } : previous);
         }
+        return url;
+      } catch {
+        // Keep the durable local photo; the sync engine will retry its upload.
+        if (selection === imageSelectionRef.current) setImageError('Photo conservée sur cet appareil. Envoi en attente ; elle sera visible sur les autres appareils après synchronisation.');
+        return reference;
       }
-    } catch (error) {
-      setImageError(error.message || 'Impossible d’enregistrer cette image.');
+    })();
+    imageTaskRef.current = task;
+    try { await task; }
+    catch (error) { if (selection === imageSelectionRef.current) setImageError(error.message || 'Impossible d’enregistrer cette image.'); }
+    finally {
+      if (imageTaskRef.current === task) {
+        imageTaskRef.current = null;
+        setImageUploading(false);
+      }
     }
   };
   const handleImageUpload = async event => {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (file) await storeImage(file);
   };
 
@@ -282,8 +309,23 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     } catch {
       catalogSpecs = {};
     }
+    setSaving(true);
+    let selectedImage = imageValueRef.current;
+    try {
+      const task = imageTaskRef.current;
+      if (task) {
+        const completed = await task;
+        if (completed === null) throw new Error('Attendez que la photo soit enregistrée.');
+        selectedImage = completed;
+      }
+    } catch (error) {
+      setFormError(error.message || 'Impossible d’enregistrer la photo. Réessayez.');
+      setSaving(false);
+      return;
+    }
     const finalData = {
       ...formData,
+      image_url: selectedImage,
       quantity: Number(initialQuantity),
       min_stock: formData.min_stock === '' ? 5 : Number(formData.min_stock),
       unit_cost: Number(formData.unit_cost),
@@ -303,7 +345,6 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
       finalData.unit_cost = 0;
       finalData.price = 0;
     }
-    setSaving(true);
     try {
       if (!initialData && finalData.tracking_mode !== 'QUANTITY' && parseIdentifiers(finalData.identifiers, finalData.tracking_mode).length !== finalData.quantity) throw new Error('Indiquez un identifiant par appareil reçu.');
       await Promise.resolve(onSubmit(finalData));
@@ -485,9 +526,10 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" style={{ display: 'none' }} />
               <button type="button" className="btn btn-secondary" onClick={() => setCameraOpen(true)} style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Camera size={15} /> Prendre une photo</button>
               <button type="button" className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} style={{ padding: '7px 12px', fontSize: '0.8rem' }}>Choisir une image</button>
-              {formData.image_url && <button type="button" onClick={() => setFormData(previous => ({ ...previous, image_url: null }))} style={{ padding: '7px 8px', fontSize: '0.8rem', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Supprimer</button>}
+              {formData.image_url && <button type="button" onClick={() => { imageSelectionRef.current += 1; imageTaskRef.current = null; imageValueRef.current = null; setImageUploading(false); setImageError(''); setFormData(previous => ({ ...previous, image_url: null })); }} style={{ padding: '7px 8px', fontSize: '0.8rem', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Supprimer</button>}
             </div>
             {imageError && <div style={{ marginTop: '7px', color: 'var(--danger)', fontSize: '0.75rem', fontWeight: 600 }}>{imageError}</div>}
+            {imageUploading && <div role="status" style={{ marginTop: '7px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Préparation de la photo…</div>}
             {formData.image_url && formData.catalog_id && <div style={{ marginTop: '7px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Image du catalogue disponible hors connexion après son chargement.</div>}
           </div>
           <details className="wizard-optional"><summary>Ajouter une description</summary><textarea name="description" value={formData.description} onChange={handleChange} placeholder="État, garantie ou détail utile…" style={{ ...inputStyle, minHeight: '72px', resize: 'vertical', marginTop: '10px' }} /></details>

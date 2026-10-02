@@ -7,9 +7,15 @@ export function LocalImage({ src, fallback = null, ...props }) {
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    const onOnline = () => setRetry(value => value + 1);
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
+    const retryImage = () => setRetry(value => value + 1);
+    window.addEventListener('online', retryImage);
+    window.addEventListener('focus', retryImage);
+    window.addEventListener('nstock-session', retryImage);
+    return () => {
+      window.removeEventListener('online', retryImage);
+      window.removeEventListener('focus', retryImage);
+      window.removeEventListener('nstock-session', retryImage);
+    };
   }, []);
 
   useEffect(() => {
