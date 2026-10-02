@@ -69,6 +69,20 @@ test('existing session resumes offline; access expiry does not close it; logout 
   assert.equal(s.api.hasStoredSessionFor('u1'),false);
 });
 
+test('lost local cache is restored with one coalesced refresh and keeps the account identity', async () => {
+  const s = setup();
+  await s.api.acceptSession({ access_token: s.token(-10), offline_access_until: s.expiry, user_id: 'u1' });
+  s.context.navigator.onLine = false; // Some mobile browsers report a false offline hint.
+  s.reply(async () => ({ ok: true, json: async () => ({
+    access_token: s.token(900), offline_access_until: s.expiry, user_id: 'u1',
+    user: { id: 'u1' }, shop: { id: 'shop-1' },
+  }) }));
+  const recovered = await Promise.all(Array.from({ length: 4 }, () => s.api.recoverLocalSession()));
+  assert.equal(s.requests(), 1, 'rotation is single-use even during repeated app initialization');
+  assert.ok(recovered.every(result => result.shop.id === 'shop-1'));
+  assert.equal(s.api.hasStoredSessionFor('u1'), true);
+});
+
 test('old browser API override cannot redirect authentication to a different backend', async () => {
   const s=setup();let url;
   s.storage.set('backend_url','https://old-server.example');

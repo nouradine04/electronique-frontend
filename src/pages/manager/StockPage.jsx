@@ -1,7 +1,7 @@
 import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '../../db/useQuery.js';
-import { queryProducts, queryCategories, queryStockMovements, updateProduct, createProduct } from '../../db/queries.js';
+import { queryProducts, queryCategories, queryStockMovements, updateProduct } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { recordStockMovement } from '../../services/syncEngine.js';
@@ -20,7 +20,7 @@ import './stock.css';
 import { ManagerStockList } from '../../components/stock/ManagerStockList.jsx';
 import { ManagerStockJournal } from '../../components/stock/ManagerStockJournal.jsx';
 
-export function ManagerStockPage({ onOpenAddProduct }) {
+export function ManagerStockPage() {
   const { currentShop, userName } = useShop();
   const { showToast } = useToast();
 
@@ -104,29 +104,25 @@ export function ManagerStockPage({ onOpenAddProduct }) {
 
   const handleSaveProduct = async (productData) => {
     try {
-      if (productData.id) {
-        const currentProduct = products.find(product => product.id === productData.id);
-        const requestedQuantity = Number(productData.quantity || 0);
-        await updateProduct(productData, {
-          ...productData,
-          quantity: currentProduct?.quantity ?? requestedQuantity,
+      const currentProduct = products.find(product => product.id === productData.id);
+      if (!currentProduct) throw new Error('Produit introuvable.');
+      const requestedQuantity = Number(productData.quantity || 0);
+      await updateProduct(currentProduct, {
+        ...productData,
+        quantity: currentProduct.quantity,
+      });
+      if (requestedQuantity !== Number(currentProduct.quantity || 0)) {
+        await recordStockMovement({
+          shop_id: currentShop.id,
+          product_id: currentProduct.id,
+          product_name: currentProduct.name,
+          type: 'ADJUST',
+          quantity: requestedQuantity,
+          reason: 'Correction depuis la fiche produit',
+          user_name: userName,
         });
-        if (currentProduct && requestedQuantity !== Number(currentProduct.quantity || 0)) {
-          await recordStockMovement({
-            shop_id: currentShop.id,
-            product_id: currentProduct.id,
-            product_name: currentProduct.name,
-            type: 'ADJUST',
-            quantity: requestedQuantity,
-            reason: 'Correction depuis la fiche produit',
-            user_name: userName,
-          });
-        }
-        showToast('Composant mis à jour.', 'success');
-      } else {
-        await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName });
-        showToast('Nouveau composant ajouté.', 'success');
       }
+      showToast('Composant mis à jour.', 'success');
       setProductFormModal({ open: false, product: null });
     } catch (err) {
       throw err;
@@ -148,7 +144,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
       
 
 
-      <header className="ms-heading"><div><h2>Stock</h2><p>{currentShop?.name} · inventaire de la boutique</p></div><button className="btn btn-primary ms-add" aria-label="Ajouter un produit" onClick={() => setProductFormModal({ open: true, product: null })}><Plus size={18} /><span>Ajouter un produit</span></button></header>
+      <header className="ms-heading"><div><h2>Stock</h2><p>{currentShop?.name} · inventaire de la boutique</p></div></header>
       <div className="ms-overview" aria-label="Résumé du stock">
         <button type="button" onClick={() => { setActiveView('inventory'); setStatusFilter('ALL'); }}><span>Produits</span><strong>{products.length}</strong></button>
         <div><span>Unités disponibles</span><strong>{totalUnits}</strong></div>
@@ -243,7 +239,7 @@ export function ManagerStockPage({ onOpenAddProduct }) {
         />
       )}
 
-      {(productFormModal.open || onOpenAddProduct) && (
+      {productFormModal.open && (
         <AddProductWizard
           initialData={productFormModal.product}
           categories={categories}

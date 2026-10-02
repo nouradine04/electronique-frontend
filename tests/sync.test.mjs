@@ -121,7 +121,7 @@ test('cloud account restoration preserves the server ID without treating it as a
 test('real Watermelon: remote updates stay synced, replay is read-only, local edits survive', async () => {
   const schema = appSchema({ version: 1, tables: [tableSchema({ name: 'products', columns: [
     { name: 'name', type: 'string' }, { name: 'quantity', type: 'number' },
-    { name: 'synced', type: 'boolean' }, { name: 'image_url', type: 'string' },
+    { name: 'synced', type: 'boolean' }, { name: 'image_url', type: 'string', isOptional: true },
     { name: 'version', type: 'number', isOptional: true },
   ] })] });
   const adapter = new LokiAdapter({ schema, useWebWorker: false, useIncrementalIndexedDB: false,
@@ -143,6 +143,9 @@ test('real Watermelon: remote updates stay synced, replay is read-only, local ed
   for (let i = 0; i < 20; i++) await apply(snapshot(5));
   assert.equal(flushes, written, 'identical remote data must not write');
   assert.equal(await db.get('products').query(Q.where('_status', 'updated')).fetchCount(), 0);
+
+  await apply({ products: { created: [], updated: [{ id: 'phone1', name: 'Phone', quantity: 5, image_url: null }], deleted: [] } });
+  assert.equal(product._raw.image_url, null, 'a photo removed on another device must disappear locally');
 
   await db.write(() => product.update(p => p._setRaw('quantity', 6)));
   assert.equal(product._raw._status, 'updated');

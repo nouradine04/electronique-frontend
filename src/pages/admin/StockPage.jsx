@@ -2,30 +2,23 @@ import { useUnitProductMatches } from '../../components/stock/useUnitProductMatc
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '../../db/useQuery.js';
-import { queryProducts, queryCategories, updateProduct, createProduct } from '../../db/queries.js';
+import { queryProducts, queryCategories, updateProduct } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
-import { useToast } from '../../context/ToastContext.jsx';
-import { recordStockMovement } from '../../services/syncEngine.js';
-import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { LocalImage } from '../../components/common/LocalImage.jsx';
-import { AddCategoryModal } from '../../components/stock/AddCategoryModal';
-import { Search, Plus, ChevronRight, Package, AlertCircle, X, DollarSign, Save, Check, ArrowDown, Clock3, CircleX } from 'lucide-react';
+import { Search, ChevronRight, Package, AlertCircle, X, DollarSign, Save, Check, ArrowDown, Clock3, CircleX } from 'lucide-react';
 import './stock.css';
 
 export function AdminStockPage() {
   const { t } = useTranslation();
-  const { currentShop, userName } = useShop();
-  const { showToast } = useToast();
+  const { currentShop } = useShop();
   const [searchQuery, setSearchQuery] = useState('');
   const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedProductForPrice, setSelectedProductForPrice] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
-  const [showAddProduct, setShowAddProduct] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showAddCategory, setShowAddCategory] = useState(false);
 
   const categories = useQuery(queryCategories(currentShop?.id || '')) || [];
   const products = useQuery(queryProducts(currentShop?.id || '')) || [];
@@ -46,16 +39,6 @@ export function AdminStockPage() {
   useEffect(() => setCurrentPage(1), [searchQuery, selectedCategory, currentShop?.id]);
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
-  const handleAddProduct = async (productData) => {
-    try {
-      await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName , status: 'ACTIVE' });
-      setShowAddProduct(false);
-      showToast('Produit enregistré et disponible à la vente.', 'success');
-    } catch (error) {
-      throw error;
-    }
-  };
-
   if (selectedProductId) {
     return <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
   }
@@ -66,10 +49,7 @@ export function AdminStockPage() {
       {/* Header */}
       <div className="as-header">
         <div className="as-title-row">
-          <div><h2>{t('admin.stock_title', 'Stock & Produits')}</h2><p>{filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''} dans {currentShop?.name}</p></div>
-          <button type="button" aria-label="Ajouter un produit" onClick={() => setShowAddProduct(true)} className="btn btn-primary as-add">
-            <Plus size={18} /> <span>Ajouter un produit</span>
-          </button>
+          <div><h2>Stock</h2><p>{filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''} dans {currentShop?.name}</p></div>
         </div>
         
         <div className="as-search">
@@ -107,7 +87,6 @@ export function AdminStockPage() {
           </button>
         ))}
       </div>
-      <button type="button" className="as-category-add" onClick={() => setShowAddCategory(true)}><Plus size={16} /><span>Catégorie</span></button>
       </div>
 
       {/* Pending Products Banner */}
@@ -175,7 +154,6 @@ export function AdminStockPage() {
         )}
       </div>
       <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredProducts.length} itemLabel="produit" onPageChange={setCurrentPage} />
-      {showAddCategory && <AddCategoryModal shopId={currentShop?.id} categories={categories} onClose={() => setShowAddCategory(false)} onCreated={() => showToast('Catégorie ajoutée.', 'success')} />}
 
       {/* Admin Price Completion Modal */}
       {selectedProductForPrice && (
@@ -236,14 +214,6 @@ export function AdminStockPage() {
             </form>
           </div>
         </div>
-      )}
-
-      {showAddProduct && (
-        <AddProductWizard
-          categories={categories}
-          onClose={() => setShowAddProduct(false)}
-          onSubmit={handleAddProduct}
-        />
       )}
 
     </div>

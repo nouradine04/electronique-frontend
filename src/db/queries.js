@@ -11,7 +11,9 @@ import { protectedEntityIds, prepareOperation } from '../services/operationQueue
 import { syncDependencies } from '../services/syncConflicts';
 import { acknowledgeVersions } from '../services/acknowledgeVersions';
 import { deletedIdsForShop, forgetDeletedShop, markRecordDeleted } from './deletionScope';
-import database from './watermelondb';
+import database, { flushLocalDatabase } from './watermelondb';
+import { requestJson } from '../services/apiClient';
+import { assertSessionWritable } from '../services/session';
 export { database };
 // Toute future suppression métier WatermelonDB doit passer par cette fonction.
 export const markLocalRecordDeleted = record => markRecordDeleted(database, record);
@@ -202,12 +204,25 @@ export const decrementProductStock = async (product, qty) => {
 };
 
 export const deleteProduct = async (product) => {
-  return database.write(async () => {
-    return product.update(record => {
-      record.status = 'ARCHIVED';
-      record.synced = false;
-    });
-  });
+  assertSessionWritable();
+  if (Number(product.quantity) > 0) throw new Error('Videz le stock avant de supprimer ce produit.');
+  const shopId = product.shopId;
+  const [linkedSales, linkedUnits, pendingLinks] = await Promise.all([
+    sales.query(Q.where('shop_id', shopId), Q.where('product_id', product.id)).fetchCount(),
+    database.get('product_units').query(Q.where('shop_id', shopId), Q.where('product_id', product.id)).fetchCount(),
+    database.get('sync_operation_links').query(Q.where('entity_table', 'products'), Q.where('entity_id', product.id)).fetchCount(),
+  ]);
+  if (linkedSales) throw new Error('Ce produit possède des ventes et ne peut pas être supprimé.');
+  if (linkedUnits) throw new Error('Ce produit possède des appareils suivis et ne peut pas être supprimé.');
+  if (pendingLinks) throw new Error('Attendez la synchronisation du stock avant de supprimer ce produit.');
+  try {
+    await requestJson(`/products/${encodeURIComponent(product.id)}?shopId=${encodeURIComponent(shopId)}`, { method: 'DELETE' });
+  } catch (error) {
+    // A never-synced product may not exist on the server yet.
+    if (error.status !== 404 || product._raw._status !== 'created') throw error;
+  }
+  await markLocalRecordDeleted(product);
+  await flushLocalDatabase();
 };
 
 // ─── CLIENTS ──────────────────────────────────────────────────────────────────

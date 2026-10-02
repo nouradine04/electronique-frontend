@@ -22,7 +22,7 @@ import {
 import { BrandLogo } from '../BrandLogo';
 import './navigation.css';
 
-export function Header({ activeTab, onOpenAddModal, onMenuClick, onLogout }) {
+export function Header({ activeTab, onMenuClick, onLogout }) {
   const { t, i18n } = useTranslation();
   const { isOnline, isLocalOnly, isSyncing, pendingCount, triggerManualSync } = useSync();
   const { currentShop, availableShops, switchShop, addShop, userRole, userName } = useShop();

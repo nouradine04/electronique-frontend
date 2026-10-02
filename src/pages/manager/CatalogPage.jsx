@@ -1,11 +1,12 @@
 import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useEffect, useState, useMemo } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '../../db/useQuery.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
-import { queryCategories, queryProducts, createProduct, createCategory, updateProduct } from '../../db/queries.js';
-import { recordStockMovement } from '../../services/syncEngine.js';
+import { queryCategories, queryProducts, createProduct, updateProduct, deleteProduct } from '../../db/queries.js';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
+import { AddCategoryModal } from '../../components/stock/AddCategoryModal';
 import { Search, Plus, Package, LayoutGrid, List } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProductCard } from './catalog/ProductCard.jsx';
@@ -27,7 +28,8 @@ export function CatalogManagementPage() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [catName, setCatName] = useState('');
+  const [deletingProduct, setDeletingProduct] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const [view, setView] = useState('grid');
@@ -82,16 +84,17 @@ export function CatalogManagementPage() {
     }
   };
 
-  const handleSaveCategory = async (e) => {
-    e.preventDefault();
-    if (!catName.trim()) return;
+  const handleDeleteProduct = async () => {
+    if (!deletingProduct || deleting) return;
+    setDeleting(true);
     try {
-      await createCategory(currentShop.id, catName.trim());
-      setCatName('');
-      setShowAddCategory(false);
-      showToast('Catégorie ajoutée', 'success');
-    } catch (err) {
-      showToast('Erreur: ' + err.message, 'danger');
+      await deleteProduct(deletingProduct);
+      setDeletingProduct(null);
+      showToast('Produit supprimé.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Suppression impossible. Réessayez.', 'danger');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -227,6 +230,7 @@ export function CatalogManagementPage() {
               view={view}
               onOpen={() => setSelectedProductId(product.id)}
               onEdit={() => setEditingProduct(product)}
+              onDelete={userRole === 'owner' ? () => setDeletingProduct(product) : undefined}
             />)}
           </div>
           <CatalogPagination
@@ -248,35 +252,27 @@ export function CatalogManagementPage() {
         />
       )}
 
-      {selectedProductId && <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} onEdit={product => { setSelectedProductId(null); setEditingProduct(product); }} />}
+      {selectedProductId && <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} onEdit={product => { setSelectedProductId(null); setEditingProduct(product); }} onDelete={userRole === 'owner' ? product => { setSelectedProductId(null); setDeletingProduct(product); } : undefined} />}
+
+      <Dialog.Root open={Boolean(deletingProduct)} onOpenChange={open => { if (!open && !deleting) setDeletingProduct(null); }}>
+        <Dialog.Portal>
+          <Dialog.Overlay style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(5, 18, 35, .55)' }} />
+          <Dialog.Content style={{ position: 'fixed', zIndex: 1201, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(420px, calc(100vw - 32px))', padding: 24, borderRadius: 16, background: 'var(--bg-surface)', color: 'var(--text-primary)', boxShadow: '0 18px 50px #0003' }}>
+            <Dialog.Title style={{ margin: '0 0 8px', fontSize: '1.2rem' }}>Supprimer ce produit ?</Dialog.Title>
+            <Dialog.Description style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              {deletingProduct?.name} sera retiré du catalogue. Un produit déjà vendu, encore en stock ou contenant des appareils suivis ne peut pas être supprimé.
+            </Dialog.Description>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
+              <button type="button" className="btn btn-secondary" disabled={deleting} onClick={() => setDeletingProduct(null)}>Annuler</button>
+              <button type="button" className="btn" disabled={deleting} onClick={handleDeleteProduct} style={{ background: 'var(--danger)', color: '#fff' }}>{deleting ? 'Suppression…' : 'Supprimer'}</button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {editingProduct && <AddProductWizard initialData={editingProduct} categories={categories} catalogOnly={userRole === 'manager'} onClose={() => setEditingProduct(null)} onSubmit={handleSaveProduct} />}
 
-      {showAddCategory && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Nouvelle catégorie</h3>
-            <form onSubmit={handleSaveCategory}>
-              <input 
-                type="text"
-                value={catName}
-                onChange={e => setCatName(e.target.value)}
-                placeholder="Nom de la catégorie"
-                required
-                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', marginBottom: '16px' }}
-              />
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowAddCategory(false)} style={{ padding: '8px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backgroundColor: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  Annuler
-                </button>
-                <button type="submit" style={{ padding: '8px 16px', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: BRAND, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
-                  Enregistrer
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {showAddCategory && <AddCategoryModal shopId={currentShop?.id} categories={categories} onClose={() => setShowAddCategory(false)} onCreated={() => showToast('Catégorie ajoutée.', 'success')} />}
 
     </div>
   );

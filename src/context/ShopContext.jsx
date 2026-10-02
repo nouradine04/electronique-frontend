@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { disableWebPush } from '../services/webPush';
-import { hasStoredSessionFor, logoutSession } from '../services/session';
+import { getSession, hasStoredSessionFor, logoutSession, recoverLocalSession } from '../services/session';
 import { setBackupPassword } from '../services/backupCredential';
 import { useQuery } from '../db/useQuery.js';
 import { queryAllShops, createShop, database } from '../db/queries.js';
-import { getPlanLimits, removeLegacyDemoUsers } from '../services/localAuth.js';
+import { getPlanLimits, removeLegacyDemoUsers, restoreLocalOwnerFromCloud } from '../services/localAuth.js';
 
 const ShopContext = createContext();
 
@@ -16,6 +16,7 @@ export function ShopProvider({ children }) {
   const [hasValidLocalSession, setHasValidLocalSession] = useState(false);
   const [initError, setInitError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const initStarted = useRef(false);
 
   // Requête réactive sur toutes les boutiques (mise à jour automatique)
   const allShops = useQuery(queryAllShops());
@@ -24,14 +25,25 @@ export function ShopProvider({ children }) {
     : allShops;
 
   useEffect(() => {
+    if (initStarted.current) return;
+    initStarted.current = true;
     async function init() {
-      const storedShops = await queryAllShops().fetch();
+      let storedShops = await queryAllShops().fetch();
       const storedShopId = localStorage.getItem('currentShopId');
-      const storedUserId = localStorage.getItem('currentUserId');
+      const storedUserId = getSession()?.userId || localStorage.getItem('currentUserId');
       let localUser = null;
       if (storedUserId) {
         try { localUser = await database.get('local_users').find(storedUserId); }
         catch { localUser = null; }
+      }
+      if (!localUser && getSession()?.userId && !('__TAURI_INTERNALS__' in window)) {
+        try {
+          const remote = await recoverLocalSession();
+          localUser = await restoreLocalOwnerFromCloud(remote, null);
+          storedShops = await queryAllShops().fetch();
+        } catch (error) {
+          console.warn('[Session] Restauration du cache local indisponible:', error.message);
+        }
       }
       const userShop = localUser ? storedShops.find(shop => shop.id === localUser.shopId) : null;
       const allowedShops = userShop
@@ -39,14 +51,22 @@ export function ShopProvider({ children }) {
         : [];
       const selectedShop = allowedShops.find(shop => shop.id === storedShopId) || userShop || null;
       const validSession = Boolean(localUser?.isActive && selectedShop && hasStoredSessionFor(localUser.id));
-      setCurrentShop(selectedShop);
+      setCurrentShop(validSession ? selectedShop : null);
       setHasValidLocalSession(validSession);
-      if (validSession) localStorage.setItem('currentShopId', selectedShop.id);
+      if (validSession) {
+        setCurrentUserId(localUser.id);
+        setUserRole(localUser.role);
+        setUserName(localUser.name);
+        localStorage.setItem('currentUserId', localUser.id);
+        localStorage.setItem('userRole', localUser.role);
+        localStorage.setItem('userName', localUser.name);
+        localStorage.setItem('currentShopId', selectedShop.id);
+      }
       else {
         localStorage.removeItem('userRole');
         localStorage.removeItem('userName');
-        localStorage.removeItem('currentUserId');
-        localStorage.removeItem('currentShopId');
+        // A missing or late local cache must not revoke the server session.
+        // A new login can restore this device from PostgreSQL.
       }
       setIsInitialized(true);
     }
@@ -55,7 +75,7 @@ export function ShopProvider({ children }) {
 
   // Sélection automatique de la boutique quand les données sont chargées
   useEffect(() => {
-    if (!isInitialized || allShops.length === 0) return;
+    if (!isInitialized || !hasValidLocalSession || allShops.length === 0) return;
     if (currentShop) return; // Ne pas écraser la sélection manuelle
 
     const storedShopId = localStorage.getItem('currentShopId');
@@ -64,7 +84,7 @@ export function ShopProvider({ children }) {
       if (found) { setCurrentShop(found); return; }
     }
     setCurrentShop(allShops[0]);
-  }, [allShops, isInitialized]);
+  }, [allShops, isInitialized, hasValidLocalSession]);
 
   const switchShop = async (shopId) => {
     const shop = allShops.find(s => s.id === shopId) || await database.get('shops').find(shopId);

@@ -27,7 +27,7 @@ function movementLabel(movement) {
   return 'Ajustement';
 }
 
-export function ProductDetailPage({ productId, onBack, onEdit, initialUnitSearch = '' }) {
+export function ProductDetailPage({ productId, onBack, onEdit, onDelete, initialUnitSearch = '' }) {
   const { userRole, userName } = useShop();
   const isOwner = userRole === 'owner';
   const reducedMotion = useReducedMotion();
@@ -116,6 +116,7 @@ export function ProductDetailPage({ productId, onBack, onEdit, initialUnitSearch
 
           <footer className="pd-footer">
             {onEdit && <button type="button" className="btn btn-primary" onClick={() => onEdit(product)}><Pencil size={16} />Modifier la fiche</button>}
+            {onDelete && <button type="button" className="btn btn-secondary" style={{ color: 'var(--danger)' }} onClick={() => onDelete(product)}>Supprimer</button>}
             <Dialog.Close className="btn btn-secondary">Fermer</Dialog.Close>
           </footer>
         </motion.div>

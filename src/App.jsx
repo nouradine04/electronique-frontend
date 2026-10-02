@@ -31,6 +31,7 @@ import { ensurePersistentStorage } from './services/persistentStorage.js';
 import { closeDesktopVault, isTauriDesktop } from './services/desktopVault';
 import { stopDesktopBackup } from './services/desktopBackup';
 import { SessionNotice } from './components/auth/SessionNotice';
+import { getSession } from './services/session';
 
 function MainAppContent() {
   const { currentShop, userRole, isInitialized, hasValidLocalSession, logout } = useShop();
@@ -38,9 +39,8 @@ function MainAppContent() {
   const { records: sales, loading: salesLoading } = useQueryState(querySales(currentShop?.id || ''));
   // Le coffre SQLCipher exige une ouverture explicite après chaque redémarrage
   // de l'application desktop. La version web conserve son comportement actuel.
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !isTauriDesktop() && !!localStorage.getItem('userRole'));
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !isTauriDesktop() && Boolean(getSession()?.userId));
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'dashboard'
-  const [showAddModal, setShowAddModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(() => isInstalledApp() ? 'login' : 'landing');
 
@@ -55,10 +55,9 @@ function MainAppContent() {
   // authentification valide. Ce cas peut arriver après un nettoyage navigateur.
   React.useEffect(() => {
     if (!isInitialized || !isAuthenticated || (hasValidLocalSession && currentShop)) return;
-    logout();
     setIsAuthenticated(false);
     setCurrentPage('login');
-  }, [isInitialized, isAuthenticated, hasValidLocalSession, currentShop, logout]);
+  }, [isInitialized, isAuthenticated, hasValidLocalSession, currentShop]);
 
   // Demande la persistance dès l'ouverture, avant une éventuelle inscription.
   // Les comptes et les premières données bénéficient ainsi de la protection
@@ -159,7 +158,6 @@ function MainAppContent() {
         <Header
           onLogout={handleLogout}
           activeTab={activeTab}
-          onOpenAddModal={() => setShowAddModal(true)}
           onMenuClick={() => setIsMobileMenuOpen(true)}
         />
 
@@ -174,7 +172,7 @@ function MainAppContent() {
             userRole === 'owner' ? (
               <AdminStockPage />
             ) : (
-              <ManagerStockPage onOpenAddProduct={showAddModal} />
+              <ManagerStockPage />
             )
           )}
 

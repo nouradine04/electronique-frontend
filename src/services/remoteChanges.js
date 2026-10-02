@@ -62,7 +62,6 @@ async function applyRemoteChanges(database, flushLocalDatabase, changes) {
           operations.push(collection.prepareCreateFromDirtyRaw(raw));
         } else if (current._raw._status === 'synced') {
           for (const key of Object.keys(raw)) {
-            if (key === 'image_url' && String(current._raw.image_url || '').startsWith('data:image') && !row.image_url) raw[key] = current._raw[key];
             if (table === 'users' && ['password_hash', 'password_salt'].includes(key) && row.password_algorithm !== 'PBKDF2-SHA256-210000') raw[key] = current._raw[key];
           }
           // Apply server snapshots without recording a new local change.

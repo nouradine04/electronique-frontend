@@ -1,12 +1,13 @@
 import { BACKEND_URL } from '../context/backendConfig';
 
 export type SessionState = { userId: string; offlineAccessUntil: string; api: string; blocked?: boolean };
-type SessionResponse = { access_token: string; offline_access_until: string; user_id: string; refresh_token?: string };
+type SessionResponse = { access_token: string; offline_access_until: string; user_id: string; refresh_token?: string; user?: { id: string }; shop?: { id: string } };
 export class SessionError extends Error { constructor(message = 'Session expirée. Reconnexion requise.') { super(message); } }
 export class NetworkError extends Error { constructor(message = 'Serveur injoignable. Vérifiez votre connexion ou réessayez plus tard.') { super(message); } }
 export class ApiError extends Error { constructor(public status: number, message: string, public details?: unknown) { super(message); } }
 let accessToken = '';
 let refreshing: Promise<string> | null = null;
+let recovering: Promise<SessionResponse> | null = null;
 const KEY = 'nstock_session';
 const native = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 const base = () => BACKEND_URL.replace(/\/+$/, '');
@@ -93,6 +94,25 @@ export function ensureAccessToken(): Promise<string> {
   };
   refreshing = Promise.resolve(navigator.locks ? navigator.locks.request('nstock-session-refresh', refresh) : refresh()).finally(() => { refreshing = null; });
   return refreshing;
+}
+// Only used when the browser kept the session marker but evicted its local DB.
+// Coalescing matters because a refresh token is single-use, including in React StrictMode.
+export function recoverLocalSession(): Promise<SessionResponse> {
+  if (recovering) return recovering;
+  const state = getSession();
+  if (!state?.userId || state.api !== base() || state.blocked || localStorage.getItem('nstock_logout_pending')) {
+    return Promise.reject(new SessionError('Reconnexion requise pour restaurer cet appareil.'));
+  }
+  recovering = (async () => {
+    const data = await sessionRequest('/auth/refresh', native() ? { refresh_token: await nativeToken('get') } : {}) as SessionResponse;
+    if (data.user_id !== getSession()?.userId || !data.user?.id || !data.shop?.id) {
+      blockSession();
+      throw new SessionError('Session distante incomplète. Reconnectez-vous.');
+    }
+    await acceptSession(data);
+    return data;
+  })().finally(() => { recovering = null; });
+  return recovering;
 }
 export function invalidateAccessToken() { accessToken = ''; }
 export async function logoutSession() {

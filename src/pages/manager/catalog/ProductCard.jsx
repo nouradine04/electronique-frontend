@@ -2,7 +2,7 @@ import { MoreVertical, Package } from 'lucide-react';
 import { LocalImage } from '../../../components/common/LocalImage.jsx';
 import './product-card.css';
 
-export function ProductCard({ product, onOpen, onEdit, view = 'grid' }) {
+export function ProductCard({ product, onOpen, onEdit, onDelete, view = 'grid' }) {
   const quantity = Number(product.quantity || 0);
   const minimum = Number(product.minStock ?? 5);
   const pending = product.status === 'PENDING_PRICE';
@@ -23,6 +23,7 @@ export function ProductCard({ product, onOpen, onEdit, view = 'grid' }) {
         <div className="product-tile-menu">
           <button type="button" onClick={onOpen}>Voir la fiche</button>
           <button type="button" onClick={onEdit}>Modifier</button>
+          {onDelete && <button type="button" onClick={onDelete} style={{ color: 'var(--danger)' }}>Supprimer</button>}
         </div>
       </details>
     </div>

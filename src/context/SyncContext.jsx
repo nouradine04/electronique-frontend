@@ -26,7 +26,9 @@ const SYNC_ON_FOCUS = true;   // Re-sync quand l'onglet devient actif
 const SYNC_BATCH_SIZE = 500;
 const MAX_PUSH_BATCHES_PER_RUN = 10;
 const HELD_RETRY_INTERVAL = 10 * 60 * 1000;
-const cloudImage = value => /^https?:\/\//i.test(String(value || '')) ? value : undefined;
+const cloudImage = value => value == null || value === ''
+  ? null
+  : /^https?:\/\//i.test(String(value)) ? value : undefined;
 
 const payloadStateKeys = {
   users: 'users',
