@@ -295,6 +295,7 @@ export function SyncProvider({ children }) {
       }
       const operationState = await pushPendingOperations(currentShop.id, retryHeld);
       const mediaState = await recoverLocalProductMedia(currentShop.id);
+      let failedMediaCount = mediaState.failed;
       for (let batchIndex = 0; batchIndex < MAX_PUSH_BATCHES_PER_RUN; batchIndex += 1) {
         let batch = await getUnsyncedRecords(
           currentShop.id,
@@ -303,7 +304,9 @@ export function SyncProvider({ children }) {
           excluded,
         );
         if (batch.total === 0) break;
-        if (await prepareBatchMedia(batch, currentShop.id)) {
+        const batchMedia = await prepareBatchMedia(batch, currentShop.id, mediaState.failedRefs);
+        failedMediaCount += batchMedia.failed;
+        if (batchMedia.changed) {
           batch = await getUnsyncedRecords(currentShop.id, userRole === 'owner', SYNC_BATCH_SIZE, excluded);
         }
 
@@ -344,7 +347,7 @@ export function SyncProvider({ children }) {
 
       setLastSyncedAt(new Date());
       const held = Object.values(excluded).reduce((count, ids) => count + ids.length, 0);
-      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) à vérifier. ${operationState.errors[0] || ''} Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : mediaState.failed ? `${mediaState.failed} photo(s) en attente d’envoi. Réessai automatique à la prochaine synchronisation.` : '');
+      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) à vérifier. ${operationState.errors[0] || ''} Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : failedMediaCount ? `${failedMediaCount} photo(s) en attente d’envoi. Réessai automatique après quelques minutes.` : '');
       schedule.lastSuccess = Date.now();
       schedule.failures = 0;
       schedule.retryAt = 0;

@@ -6,7 +6,7 @@ import { CameraCapture } from './CameraCapture';
 import { Camera, LoaderCircle, Plus, Search, Smartphone, Trash2, Upload, X, Package, Wallet, ClipboardCheck, Pencil } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
 import { LocalImage } from '../common/LocalImage.jsx';
-import { cacheCatalogImage, saveLocalImage } from '../../services/localMedia.js';
+import { cacheCatalogImage, saveLocalImage, uploadLocalImage } from '../../services/localMedia.js';
 import { searchPhoneCatalog } from '../../services/phoneCatalog.js';
 import { FormStep, LoadingButton, StepProgress } from '../forms/FormUI';
 import { AmountInput } from '../forms/AmountInput';
@@ -50,7 +50,7 @@ function buildVariantSku(data) {
 }
 
 export function AddProductWizard({ categories, onClose, onSubmit, initialData = null, catalogOnly = false }) {
-  const { userRole, userName } = useShop();
+  const { userRole, userName, currentShop } = useShop();
   const isOwner = userRole === 'owner';
   const phoneCategory = findPhoneCategory(categories);
   const initialCategoryId = readInitial(initialData, 'category_id', 'categoryId') || '';
@@ -198,16 +198,27 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     setFormData(previous => ({ ...previous, catalog_id: '', catalog_source: 'manual' }));
   };
 
-  const handleImageUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const storeImage = async file => {
     setImageError('');
     try {
       const reference = await saveLocalImage(file);
       setFormData(previous => ({ ...previous, image_url: reference }));
+      if (navigator.onLine && currentShop?.id) {
+        try {
+          const processedUrl = await uploadLocalImage(reference, currentShop.id);
+          setFormData(previous => previous.image_url === reference ? { ...previous, image_url: processedUrl } : previous);
+        } catch {
+          // The local photo remains durable and the normal sync will retry its upload.
+          setImageError('Photo conservée. Son fond sera retiré dès que le traitement sera disponible.');
+        }
+      }
     } catch (error) {
       setImageError(error.message || 'Impossible d’enregistrer cette image.');
     }
+  };
+  const handleImageUpload = async event => {
+    const file = event.target.files?.[0];
+    if (file) await storeImage(file);
   };
 
   const totalSteps = catalogOnly ? 2 : 3;
@@ -469,7 +480,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
             <label style={labelStyle}>Image du produit</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <button type="button" onClick={() => fileInputRef.current?.click()} style={{ width: '64px', height: '64px', padding: 0, borderRadius: 'var(--radius-md)', border: '2px dashed var(--border-color)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', flexShrink: 0 }}>
-                {formData.image_url ? <LocalImage src={formData.image_url} alt="Aperçu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Upload size={20} color="var(--text-muted)" />}
+                {formData.image_url ? <LocalImage src={formData.image_url} alt="Aperçu" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff' }} /> : <Upload size={20} color="var(--text-muted)" />}
               </button>
               <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" style={{ display: 'none' }} />
               <button type="button" className="btn btn-secondary" onClick={() => setCameraOpen(true)} style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Camera size={15} /> Prendre une photo</button>
@@ -539,11 +550,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
           </div>
         </form>
       </div>
-      {cameraOpen && <CameraCapture onClose={closeCamera} onCapture={async file => {
-        const reference = await saveLocalImage(file);
-        setFormData(previous => ({ ...previous, image_url: reference }));
-        setImageError('');
-      }} />}
+      {cameraOpen && <CameraCapture onClose={closeCamera} onCapture={storeImage} />}
     </div>
   );
 }

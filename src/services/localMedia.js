@@ -108,10 +108,18 @@ export async function uploadLocalImage(value, shopId) {
   const upload = await fetch(apiUrl(`/media/${encodeURIComponent(shopId)}`), {
     method: 'POST', headers: getAuthHeaders({ 'Content-Type': blob.type || 'image/webp' }), body: blob,
   });
-  if (!upload.ok) throw new Error(`Envoi de la photo impossible (${upload.status}).`);
+  if (!upload.ok) {
+    const problem = await upload.json().catch(() => null);
+    const reason = typeof problem?.message === 'string' ? problem.message : '';
+    const error = new Error(reason || `Envoi de la photo impossible (${upload.status}).`);
+    error.status = upload.status;
+    throw error;
+  }
   const { url } = await upload.json();
   if (!isPrivateMediaUrl(url)) throw new Error('Adresse de photo invalide.');
-  await (await caches.open(privateCache())).put(apiUrl(privateMediaPath(url)), new Response(blob, { headers: { 'Content-Type': blob.type } }));
+  // The server returns a cut-out WebP. Never cache the original photo under its new URL.
+  const processed = await fetch(apiUrl(privateMediaPath(url)), { headers: getAuthHeaders() });
+  if (processed.ok) await (await caches.open(privateCache())).put(apiUrl(privateMediaPath(url)), processed.clone());
   // Keep the pending copy until the local record has durably stored the new URL.
   return url;
 }
