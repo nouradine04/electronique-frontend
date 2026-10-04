@@ -15,7 +15,7 @@ import { FormDivider, FormField, FormInput } from '../../components/ui/FormContr
 import { LoadingScreen } from '../../components/ui/LoadingScreen';
 import { closeDesktopVault, isTauriDesktop, openDesktopVault } from '../../services/desktopVault';
 import { restoreWatermelonFromDesktop, startDesktopBackupForShop } from '../../services/desktopBackup';
-import { NetworkError } from '../../services/session';
+import { ApiError, NetworkError } from '../../services/session';
 import { acceptSession, sessionRequest } from '../../services/session';
 import { setBackupPassword } from '../../services/backupCredential';
 
@@ -30,25 +30,32 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!identifier.trim()) { setError('Saisissez votre email.'); return; }
-    if (identifier.trim().length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) { setError('Indiquez une adresse email valide.'); return; }
-    if (!password) { setError('Saisissez votre mot de passe.'); return; }
-    if (password.length > 1024) { setError('Le mot de passe est trop long.'); return; }
+    // Password managers can fill the DOM without dispatching React's onChange.
+    // Read the visible fields at submission so the server receives what the user sees.
+    const form = e.currentTarget;
+    const submittedEmail = form?.elements?.namedItem('email')?.value ?? identifier;
+    const submittedPassword = form?.elements?.namedItem('password')?.value ?? password;
+    setIdentifier(submittedEmail);
+    setPassword(submittedPassword);
+    if (!submittedEmail.trim()) { setError('Saisissez votre email.'); return; }
+    if (submittedEmail.trim().length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submittedEmail.trim())) { setError('Indiquez une adresse email valide.'); return; }
+    if (!submittedPassword) { setError('Saisissez votre mot de passe.'); return; }
+    if (submittedPassword.length > 1024) { setError('Le mot de passe est trop long.'); return; }
     setLoading(true);
     setConnectionError(false);
     setError('');
 
     try {
       if (isTauriDesktop()) {
-        await openDesktopVault(identifier, password);
+        await openDesktopVault(submittedEmail, submittedPassword);
       }
-      const cloudSession = await loginCloudAccount(identifier, password);
+      const cloudSession = await loginCloudAccount(submittedEmail, submittedPassword);
       if (isTauriDesktop()) await restoreWatermelonFromDesktop();
-      const user = await restoreLocalOwnerFromCloud(cloudSession, password);
+      const user = await restoreLocalOwnerFromCloud(cloudSession, submittedPassword);
       const { role, name } = user;
       await switchShop(user.shopId);
       await startDesktopBackupForShop(user.shopId);
-      setBackupPassword(password);
+      setBackupPassword(submittedPassword);
       switchRole(role, name, user.id);
       setLoading(false);
       onLoginSuccess(role);
@@ -56,7 +63,9 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
     } catch (err) {
       if (err instanceof NetworkError) setConnectionError(true);
       if (isTauriDesktop()) void closeDesktopVault();
-      setError(`${err.message || 'Erreur lors de la connexion'} (Serveur: ${BACKEND_URL})`);
+      setError(err instanceof ApiError && err.status === 401
+        ? 'Email ou mot de passe incorrect. Vérifiez les informations saisies.'
+        : `${err.message || 'Erreur lors de la connexion'} (Serveur: ${BACKEND_URL})`);
       setLoading(false);
     }
   };
@@ -95,14 +104,14 @@ export function LoginPage({ onLoginSuccess, onNavigate }) {
           {error && identifier && password && <div className="auth-error" role="alert">{error}</div>}
           <form onSubmit={handleSubmit} noValidate>
             <FormField id="login-identifier" label="Email" error={error && !identifier ? 'Indiquez votre email.' : null}>
-              <FormInput id="login-identifier" leadingIcon={<UserRound size={18} />} type="email" inputMode="email"
+              <FormInput id="login-identifier" name="email" leadingIcon={<UserRound size={18} />} type="email" inputMode="email"
                 autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 value={identifier} onChange={e => setIdentifier(e.target.value)} placeholder="vous@exemple.com" maxLength={100} required
                 aria-invalid={Boolean(error) && !identifier} />
             </FormField>
             <FormField id="login-password" label="Mot de passe" error={error && !password ? 'Indiquez votre mot de passe.' : null}>
               <div className="auth-password">
-                <FormInput id="login-password" leadingIcon={<Lock size={18} />} type={showPassword ? 'text' : 'password'}
+                <FormInput id="login-password" name="password" leadingIcon={<Lock size={18} />} type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} maxLength={1024}
                   placeholder="Votre mot de passe" required aria-invalid={Boolean(error) && !password} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} aria-pressed={showPassword}>

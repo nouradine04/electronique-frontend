@@ -62,9 +62,14 @@
 .as-stock-value strong { font-size: clamp(18px, 2.4vw, 25px); color: var(--accent-primary); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .as-stock-value small { font-size: 11px; }
 .as-stock-value .as-margin strong { color: var(--text-primary); }
+.as-stock-value .as-margin { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px 12px; }
+.as-margin-label { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.as-margin-label svg { flex: 0 0 auto; color: var(--accent-primary); }
+.as-margin-result { display: grid; min-width: 0; gap: 2px; }
 .as-stock-value .as-margin-rate { color: var(--accent-primary); font-weight: 700; }
 .as-stock-value .as-margin.is-negative strong,
-.as-stock-value .as-margin.is-negative .as-margin-rate { color: var(--danger); }
+.as-stock-value .as-margin.is-negative .as-margin-rate,
+.as-stock-value .as-margin.is-negative .as-margin-label svg { color: var(--danger); }
 .as-finance-note { grid-column: 1 / -1; margin: 0; color: var(--text-muted); font-size: 11px; }
 .as-quantity { display: flex; align-items: baseline; gap: 4px; }
 .as-quantity strong { font-size: 17px; font-variant-numeric: tabular-nums; }
@@ -113,7 +118,10 @@
 @media (max-width: 560px) {
   .as-stock-value { gap: 12px; padding: 14px; }
   .as-stock-value > div + div { padding-left: 10px; }
-  .as-stock-value > .as-margin { padding-left: 0; }
+  .as-stock-value > .as-margin { padding-left: 0; align-items: flex-start; }
+  .as-margin-label { flex: 1 1 135px; font-size: 11px; line-height: 1.35; }
+  .as-margin-result { flex: 0 1 auto; text-align: right; }
+  .as-margin-result strong { line-height: 1.2; }
   .as-stock-value strong { font-size: clamp(16px, 5vw, 21px); }
 }
 

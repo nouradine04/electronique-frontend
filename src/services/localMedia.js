@@ -1,5 +1,6 @@
 import { apiUrl, getAuthHeaders } from './apiClient';
 import { ensureAccessToken, invalidateAccessToken } from './session';
+import { readStoredImage, writeStoredImage } from './browserMediaStore';
 
 const localPrefix = 'local-media://';
 const pendingCache = () => `nstock-pending-images-${localStorage.getItem('currentUserId') || 'local'}`;
@@ -51,21 +52,22 @@ export async function saveLocalImage(file, options = {}) {
   const dataUrl = await compressImage(file, options.maxDimension, options.quality);
   const blob = await (await fetch(dataUrl)).blob();
   const reference = `${localPrefix}${crypto.randomUUID()}.webp`;
-  const cache = await caches.open(pendingCache());
-  await cache.put(localKey(reference), new Response(blob, { headers: { 'Content-Type': 'image/webp' } }));
+  await writeStoredImage(pendingCache(), localKey(reference), new Response(blob, { headers: { 'Content-Type': blob.type || 'image/webp' } }), { required: true });
   return reference;
 }
 
 /** Conserve une image publique du catalogue pour son affichage hors connexion. */
 export async function cacheCatalogImage(url) {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || typeof caches === 'undefined') return false;
-  const cache = await caches.open('nstock-product-images');
-  const request = new Request(url, { mode: 'no-cors' });
-  if (await cache.match(request)) return true;
-  const response = await fetch(request);
-  if (!response.ok && response.type !== 'opaque') return false;
-  await cache.put(request, response.clone());
-  return true;
+  try {
+    const cache = await caches.open('nstock-product-images');
+    const request = new Request(url, { mode: 'no-cors' });
+    if (await cache.match(request)) return true;
+    const response = await fetch(request);
+    if (!response.ok && response.type !== 'opaque') return false;
+    await cache.put(request, response.clone());
+    return true;
+  } catch { return false; }
 }
 
 export const isLocalMediaReference = value => String(value || '').startsWith(localPrefix) || isPrivateMediaUrl(value);
@@ -84,20 +86,21 @@ async function fetchPrivateMedia(url, options = {}) {
 
 export async function resolveLocalImage(value) {
   if (String(value).startsWith(localPrefix)) {
-    const response = await (await caches.open(pendingCache())).match(localKey(value));
+    const response = await readStoredImage(pendingCache(), localKey(value));
     if (!response) throw new Error('Photo locale introuvable.');
     return URL.createObjectURL(await response.blob());
   }
   if (isPrivateMediaUrl(value)) {
-    const cache = await caches.open(privateCache());
     const canonicalUrl = apiUrl(privateMediaPath(value));
-    let response = await cache.match(canonicalUrl) || await cache.match(value);
+    let response = await readStoredImage(privateCache(), canonicalUrl) || await readStoredImage(privateCache(), value);
     if (!response) {
       response = await fetchPrivateMedia(canonicalUrl);
-      if (!response.ok) throw new Error('Image inaccessible.');
-      await cache.put(canonicalUrl, response.clone());
-      const entries = await cache.keys();
-      for (const entry of entries.slice(0, Math.max(0, entries.length - 300))) await cache.delete(entry);
+      if (!response.ok) {
+        const error = new Error(`Lecture de la photo impossible (${response.status}).`);
+        error.status = response.status;
+        throw error;
+      }
+      await writeStoredImage(privateCache(), canonicalUrl, response.clone());
     }
     return URL.createObjectURL(await response.blob());
   }
@@ -107,8 +110,7 @@ export async function resolveLocalImage(value) {
 export async function uploadLocalImage(value, shopId) {
   const isPending = String(value).startsWith(localPrefix);
   if (!isPending && !String(value).startsWith('data:image/')) return value;
-  const cache = await caches.open(pendingCache());
-  const response = isPending ? await cache.match(localKey(value)) : await fetch(value);
+  const response = isPending ? await readStoredImage(pendingCache(), localKey(value)) : await fetch(value);
   if (!response) throw new Error('Photo locale manquante : synchronisation conservée en attente.');
   const blob = await response.blob();
   const upload = await fetchPrivateMedia(apiUrl(`/media/${encodeURIComponent(shopId)}`), {
@@ -126,7 +128,7 @@ export async function uploadLocalImage(value, shopId) {
   // The server returns a cut-out WebP. Never cache the original photo under its new URL.
   const processed = await fetchPrivateMedia(apiUrl(privateMediaPath(url)));
   if (!processed.ok) throw new Error(`La photo a été envoyée, mais sa lecture a échoué (${processed.status}).`);
-  await (await caches.open(privateCache())).put(apiUrl(privateMediaPath(url)), processed.clone());
+  await writeStoredImage(privateCache(), apiUrl(privateMediaPath(url)), processed.clone());
   // Keep the pending copy until the local record has durably stored the new URL.
   return url;
 }

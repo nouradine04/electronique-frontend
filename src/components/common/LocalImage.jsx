@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { isLocalMediaReference, resolveLocalImage } from '../../services/localMedia.js';
 
+const reportedPhotoFailures = new Set();
+
 export function LocalImage({ src, fallback = null, ...props }) {
   const [resolvedSource, setResolvedSource] = useState(() => isLocalMediaReference(src) ? '' : (src || ''));
   const [failed, setFailed] = useState(false);
@@ -37,8 +39,18 @@ export function LocalImage({ src, fallback = null, ...props }) {
       objectUrl = url;
       if (active) setResolvedSource(url);
       else if (url) URL.revokeObjectURL(url);
-    }).catch(() => {
-      if (active) setResolvedSource('');
+    }).catch(error => {
+      if (active) {
+        setResolvedSource('');
+        if (navigator.onLine !== false) {
+          const reason = error?.status || error?.message || 'Erreur inconnue';
+          const key = `${src}:${reason}`;
+          if (!reportedPhotoFailures.has(key)) {
+            reportedPhotoFailures.add(key);
+            console.warn('[Photos] Lecture impossible :', reason);
+          }
+        }
+      }
     });
 
     return () => {
