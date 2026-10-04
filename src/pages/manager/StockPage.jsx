@@ -9,6 +9,7 @@ import { recordStockMovement } from '../../services/syncEngine.js';
 import { StockMovementModal } from '../../components/stock/StockMovementModal.jsx';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
+import { attachProductPhotoAfterSave } from '../../services/productPhotoAfterSave.js';
 import {
   Search,
   Plus,
@@ -118,12 +119,12 @@ export function ManagerStockPage() {
     }
   };
 
-  const handleSaveProduct = async (productData) => {
+  const handleSaveProduct = async (productData, photoFile) => {
     try {
       const currentProduct = products.find(product => product.id === productData.id);
       if (!currentProduct) throw new Error('Produit introuvable.');
       const requestedQuantity = Number(productData.quantity || 0);
-      await updateProduct(currentProduct, {
+      const saved = await updateProduct(currentProduct, {
         ...productData,
         quantity: currentProduct.quantity,
       });
@@ -138,7 +139,8 @@ export function ManagerStockPage() {
           user_name: userName,
         });
       }
-      showToast('Composant mis à jour.', 'success');
+      const photoWarning = await attachProductPhotoAfterSave(saved, photoFile, currentShop.id);
+      showToast(photoWarning || 'Composant mis à jour.', photoWarning ? 'warning' : 'success');
       setProductFormModal({ open: false, product: null });
     } catch (err) {
       throw err;

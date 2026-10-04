@@ -6,7 +6,7 @@
 .wizard-card button { touch-action: manipulation; }
 .wizard-card .wizard-header > button { min-width: 44px; min-height: 44px; }
 @media(max-width:600px) {
- .wizard-overlay .wizard-card { height: auto !important; max-height: calc(100dvh - max(12px, env(safe-area-inset-top))) !important; border-radius: 20px 20px 0 0 !important; }
+ .wizard-overlay .wizard-card { height: auto !important; max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important; border-radius: 18px !important; }
  .wizard-card .wizard-form { overscroll-behavior: contain; }
  .wizard-card input, .wizard-card select { min-height: 48px; font-size: 16px !important; }
  .wizard-card small { display: block; line-height: 1.5; margin-top: 6px; }

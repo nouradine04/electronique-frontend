@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { ProductCard } from './catalog/ProductCard.jsx';
 import { CatalogPagination } from './catalog/CatalogPagination.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
+import { attachProductPhotoAfterSave } from '../../services/productPhotoAfterSave.js';
 import './catalog/catalog-shortcuts.css';
 
 export function CatalogManagementPage() {
@@ -61,23 +62,25 @@ export function CatalogManagementPage() {
     return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   }, [products, selectedCategory]);
 
-  const handleSaveProduct = async (productData) => {
+  const handleSaveProduct = async (productData, photoFile) => {
     try {
       if (productData.id) {
         const current = products.find(product => product.id === productData.id);
-        await updateProduct(current, {
+        const saved = await updateProduct(current, {
           ...productData,
           quantity: current.quantity,
           price: current.price,
           unit_cost: current.unitCost,
           status: current.status,
         });
-        showToast('Fiche produit mise à jour', 'success');
+        const photoWarning = await attachProductPhotoAfterSave(saved, photoFile, currentShop.id);
+        showToast(photoWarning || 'Fiche produit mise à jour', photoWarning ? 'warning' : 'success');
         setEditingProduct(null);
         return;
       }
-      await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName });
-      showToast(userRole === 'owner' ? 'Produit enregistré.' : 'Produit enregistré. L’administrateur fixera les prix.', 'success');
+      const saved = await createProduct({ ...productData, shop_id: currentShop.id, added_by: userName });
+      const photoWarning = await attachProductPhotoAfterSave(saved, photoFile, currentShop.id);
+      showToast(photoWarning || (userRole === 'owner' ? 'Produit enregistré.' : 'Produit enregistré. L’administrateur fixera les prix.'), photoWarning ? 'warning' : 'success');
       setShowAddWizard(false);
     } catch (err) {
       throw err;

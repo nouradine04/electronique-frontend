@@ -51,6 +51,8 @@
 .owner-recent { box-shadow: 0 3px 12px rgba(15,23,42,0.05); }
 .owner-recent .owner-section-heading { background: var(--bg-main); }
 .owner-recent .owner-sale { padding: 13px 18px; }
+.owner-recent .owner-sale-amount > strong { color: var(--accent-primary); font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .owner-recent .owner-sale-amount .owner-payment { display: inline-block; padding: 3px 7px; border-radius: 4px; background: var(--bg-main); color: var(--text-secondary); font-size: 12px; font-weight: 600; }
 .owner-recent .owner-sale-amount .owner-payment.credit { background: #ea580c; color: white; }
 @media (max-width: 600px) { .owner-home { gap: 16px; } .owner-actions { grid-template-columns: repeat(2,minmax(0,1fr)); } .owner-actions .primary { grid-column: 1/-1; } .owner-actions button { flex-wrap: wrap; } .owner-metrics { grid-template-columns: 1fr; gap: 10px; } .owner-metric { padding: 16px; } .owner-metric > svg { float: right; } .owner-metric p { margin-top: 0; } .owner-sale { grid-template-columns: minmax(0,1fr); gap: 8px; } .owner-sale-amount { text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; } .owner-sale-amount small { margin: 0; } }
+@media (max-width: 600px) { .owner-recent .owner-sale { padding: 10px 14px; gap: 5px; } .owner-recent .owner-sale p { margin: 3px 0 0; } .owner-recent .owner-sale-amount > strong { font-size: 16px; } }

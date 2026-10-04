@@ -56,6 +56,14 @@ export async function saveLocalImage(file, options = {}) {
   return reference;
 }
 
+/** Upload immediately while online, without requiring browser photo storage. */
+export async function uploadImageFile(file, shopId) {
+  if (!file?.type?.startsWith('image/')) throw new Error('Choisissez un fichier image valide.');
+  if (file.size > 15 * 1024 * 1024) throw new Error('L’image ne doit pas dépasser 15 Mo.');
+  const dataUrl = await compressImage(file);
+  return uploadLocalImage(dataUrl, shopId);
+}
+
 /** Conserve une image publique du catalogue pour son affichage hors connexion. */
 export async function cacheCatalogImage(url) {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url) || typeof caches === 'undefined') return false;

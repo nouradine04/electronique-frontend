@@ -639,8 +639,8 @@ button, input, select, textarea {
 .wizard-footer > button:last-child { min-width: 150px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 
 @media (max-width: 600px) {
-  .wizard-overlay { padding: max(8px, env(safe-area-inset-top, 0px)) 0 max(0px, env(safe-area-inset-bottom, 0px)) !important; align-items: flex-end !important; }
-  .wizard-card { max-height: calc(100dvh - env(safe-area-inset-top, 0px)) !important; border-radius: 20px 20px 0 0 !important; border-bottom: 0 !important; }
+  .wizard-overlay { padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)) !important; align-items: center !important; }
+  .wizard-card { height: auto !important; max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important; border-radius: 18px !important; }
   .wizard-card form { padding: 18px 16px !important; }
   .wizard-card .step-progress { gap: 22px; }
   .wizard-card .step-progress::before { width: 150px; }
@@ -650,14 +650,8 @@ button, input, select, textarea {
 }
 
 @media (max-width: 576px) {
-  .wizard-overlay {
-    padding: 0 !important;
-  }
-  .wizard-card {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-  }
+  .wizard-overlay { padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)) !important; align-items: center !important; }
+  .wizard-card { height: auto !important; max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important; border-radius: 18px !important; }
   .wizard-stepper-header {
     padding: 0 16px !important;
     margin-bottom: 16px !important;

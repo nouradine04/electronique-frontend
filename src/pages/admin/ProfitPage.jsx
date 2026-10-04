@@ -231,8 +231,8 @@ export function ProfitPage() {
       </details>
 
       {selectedProduct && (
-        <div onMouseDown={event => event.target === event.currentTarget && setSelectedProduct(null)} style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(15,23,42,.56)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div role="dialog" aria-modal="true" style={{ width: '100%', maxWidth: '520px', maxHeight: '88vh', overflowY: 'auto', background: 'var(--bg-surface)', borderRadius: '20px 20px 0 0', boxShadow: '0 -12px 50px rgba(0,0,0,.25)' }}>
+        <div onMouseDown={event => event.target === event.currentTarget && setSelectedProduct(null)} style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(15,23,42,.56)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div role="dialog" aria-modal="true" style={{ width: '100%', maxWidth: '520px', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', background: 'var(--bg-surface)', borderRadius: '18px', boxShadow: '0 16px 50px rgba(0,0,0,.25)' }}>
             <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
               <div><h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '18px' }}>{selectedProduct.product.name}</h3><p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '12px' }}>{selectedProduct.categoryName}</p></div>
               <button onClick={() => setSelectedProduct(null)} aria-label="Fermer" style={{ width: '34px', height: '34px', border: 0, borderRadius: '50%', background: 'var(--bg-main)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><FaTimes color="var(--text-secondary)" /></button>

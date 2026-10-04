@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const source = fs.readFileSync(new URL('../src/services/localMedia.js', import.meta.url), 'utf8');
 const storeSource = fs.readFileSync(new URL('../src/services/browserMediaStore.js', import.meta.url), 'utf8');
+const afterSaveSource = fs.readFileSync(new URL('../src/services/productPhotoAfterSave.js', import.meta.url), 'utf8');
 const compiledStore = ts.transpileModule(storeSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
 function mediaHarness({ downloadStatus = 200, withoutCache = false } = {}) {
@@ -20,6 +21,8 @@ function mediaHarness({ downloadStatus = 200, withoutCache = false } = {}) {
   let browserStore;
   const context = {
     exports: {}, URL, Response, Blob, crypto: globalThis.crypto,
+    Image: class { naturalWidth = 800; naturalHeight = 600; set src(_value) { queueMicrotask(() => this.onload?.()); } },
+    document: { createElement: () => ({ getContext: () => ({ drawImage() {} }), toDataURL: () => 'data:image/webp;base64,b3JpZ2luYWw=' }) },
     localStorage: { getItem: () => 'user' },
     location: { origin: 'https://app.example.test' },
     caches: { open: async () => ({
@@ -101,6 +104,14 @@ test('a product photo is linked only after authenticated upload and processed-im
   assert.equal(await harness.stored.get(url).text(), 'processed');
 });
 
+test('an online iPhone uploads a photo without relying on local photo storage', async () => {
+  const harness = mediaHarness({ withoutCache: true });
+  const photo = new Blob(['photo'], { type: 'image/jpeg' });
+  const url = await harness.media.uploadImageFile(photo, 'shop');
+  assert.equal(url, harness.mediaUrl);
+  assert.deepEqual(harness.counts(), { refreshes: 1, uploads: 1, reads: 1 });
+});
+
 test('a photo that cannot be read back is not marked ready for another device', async () => {
   const harness = mediaHarness({ downloadStatus: 503 });
   await assert.rejects(
@@ -138,4 +149,28 @@ test('a refused private photo exposes its HTTP status for diagnosis', async () =
     assert.equal(error.status, 404);
     return true;
   });
+});
+
+test('photo attachment starts only when passed an already saved product', async () => {
+  const actions = [];
+  const context = {
+    exports: {}, navigator: { onLine: true },
+    require(specifier) {
+      if (specifier === '../db/queries.js') return { updateProduct: async (product, data) => { actions.push(['attach', product.id, data.image_url]); } };
+      if (specifier === './localMedia.js') return {
+        uploadImageFile: async () => { actions.push(['upload']); return 'https://api.example.test/media/image.webp'; },
+        saveLocalImage: async () => { throw new Error('Local storage unavailable'); },
+      };
+      throw new Error(`Unexpected import: ${specifier}`);
+    },
+  };
+  vm.runInNewContext(ts.transpileModule(afterSaveSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, context);
+  assert.equal(actions.length, 0);
+  const product = { id: 'saved-product' };
+  const warning = await context.exports.attachProductPhotoAfterSave(product, new Blob(['photo'], { type: 'image/jpeg' }), 'shop');
+  assert.equal(warning, '');
+  assert.deepEqual(actions.map(item => item[0]), ['upload', 'attach']);
+  assert.equal(actions[1][1], product.id);
 });
