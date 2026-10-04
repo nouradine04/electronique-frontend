@@ -26,7 +26,7 @@ export default defineConfig({
           {
             urlPattern: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/ocr/v6/'),
             handler: 'CacheFirst',
-            options: { cacheName: 'nstock-ocr-v6', cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 8, purgeOnQuotaError: true } },
+            options: { cacheName: 'nstock-ocr-v6', cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 12, purgeOnQuotaError: true } },
           },
           {
             urlPattern: ({ request }) => request.destination === 'image',

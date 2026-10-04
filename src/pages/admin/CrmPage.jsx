@@ -140,8 +140,8 @@ export function CrmPage() {
 
             {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{client.name || 'Client'}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem', textTransform: 'uppercase' }}>{client.name || 'Client'}</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                 <FaPhoneAlt size={9} /> {client.phone || '-'}
               </div>
               <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>

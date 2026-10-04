@@ -275,9 +275,9 @@ export function ManagerClientsPage() {
                       fontWeight: 'bold',
                       fontSize: '14px'
                     }}>{String(client.name || '?').charAt(0).toUpperCase()}</div>
-                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{client.name}</span>
+                    <span style={{ fontWeight: '700', color: 'var(--text-primary)', textTransform: 'uppercase' }}>{client.name}</span>
                   </td>
-                  <td style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>{client.phone || '-'}</td>
+                  <td style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontWeight: 700 }}>{client.phone || '-'}</td>
                   <td style={{ padding: '14px 16px', color: 'var(--text-primary)', textAlign: 'right' }}>{formatCurrency(client.totalPurchased)}</td>
                   <td style={{ padding: '14px 16px', color: 'var(--success)', textAlign: 'right' }}>{formatCurrency(client.totalPaid)}</td>
                   <td style={{ padding: '14px 16px', color: client.currentDebt > 0 ? '#b30638' : 'var(--text-primary)', fontWeight: '600', textAlign: 'right' }}>
@@ -356,8 +356,8 @@ export function ManagerClientsPage() {
                   {String(client.name || '?').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{client.name}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{client.phone || 'Pas de téléphone'}</div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', textTransform: 'uppercase' }}>{client.name}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 700 }}>{client.phone || 'Pas de téléphone'}</div>
                 </div>
               </div>
               

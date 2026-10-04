@@ -27,6 +27,10 @@ function splitCatalogOptions(value) {
 
 const DEFAULT_PHONE_COLORS = ['Noir', 'Blanc', 'Gris', 'Argent', 'Or', 'Bleu', 'Vert', 'Rouge', 'Rose', 'Violet'];
 const STANDARD_CAPACITIES = ['64 Go', '128 Go', '256 Go', '512 Go', '1 To', '2 To'];
+const normalizeCapacity = value => {
+  const match = String(value || '').trim().match(/^(64|128|256|512)\s*(?:GB|GO|G)|^(1|2)\s*(?:TB|TO|T)/i);
+  return match?.[1] ? `${match[1]} Go` : match?.[2] ? `${match[2]} To` : '';
+};
 const normalizeProductName = value => String(value || '').trim().replace(/\s+/g, ' ');
 
 function readCustomSpecs(data) {
@@ -75,7 +79,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     brand: initialData?.brand || '',
     model: initialData?.model || '',
     ram: initialData?.ram || '',
-    storage_capacity: readInitial(initialData, 'storage_capacity', 'storageCapacity'),
+    storage_capacity: normalizeCapacity(readInitial(initialData, 'storage_capacity', 'storageCapacity')),
     color: initialData?.color || '',
     sim_type: readInitial(initialData, 'sim_type', 'simType'),
     network: initialData?.network || '',
@@ -96,7 +100,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
       const source = JSON.parse(readInitial(initialData, 'specs_json', 'specsJson') || '{}');
       return {
         ram: splitCatalogOptions(source.ram),
-        storage: splitCatalogOptions(source.storage),
+        storage: [...new Set(splitCatalogOptions(source.storage).map(normalizeCapacity).filter(Boolean))],
         colors: splitCatalogOptions(source.colors),
       };
     } catch {
@@ -163,7 +167,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
     const model = String(phone.model || '').trim();
     const options = {
       ram: splitCatalogOptions(phone.ram),
-      storage: splitCatalogOptions(phone.storage),
+      storage: [...new Set(splitCatalogOptions(phone.storage).map(normalizeCapacity).filter(Boolean))],
       colors: splitCatalogOptions(phone.colors),
     };
     setCatalogOptions(options);
@@ -339,7 +343,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   const responsiveGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' };
 
   const colorOptions = Array.from(new Set([formData.color, ...catalogOptions.colors, ...DEFAULT_PHONE_COLORS].filter(Boolean)));
-  const capacityOptions = Array.from(new Set([...STANDARD_CAPACITIES, ...catalogOptions.storage, formData.storage_capacity].filter(Boolean)));
+  const capacityOptions = STANDARD_CAPACITIES;
   const hasCatalogSelection = Boolean(formData.catalog_id) && catalogStatus !== 'manual';
 
   return (

@@ -56,3 +56,12 @@ test('empty categories show an explicit next action instead of hiding the select
   assert.match(html, /Choisir une catégorie/);
   assert.match(html, /Aucune catégorie disponible/);
 });
+
+test('legacy GB capacity is shown once with the standard Go label', () => {
+  const html = render({
+    categories: [{ id: 'phones', name: 'Téléphones' }],
+    initialData: { id: 'phone', name: 'iPhone', category_id: 'phones', storage_capacity: '256GB' },
+  });
+  assert.match(html, /<option value="256 Go" selected="">256 Go<\/option>/);
+  assert.doesNotMatch(html, /<option[^>]*>256GB<\/option>/);
+});
