@@ -48,7 +48,10 @@ export function IdentifierPhotoReader({ mode, value, onChange }: { mode: Trackin
   }
   return <div style={{ display: 'grid', gap: 10, margin: '12px 0' }}>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setCamera(true)}><Camera size={17} />Scanner</button>
+      <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => {
+        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) nativeCamera.current?.click();
+        else setCamera(true);
+      }}><Camera size={17} />Scanner</button>
       <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => input.current?.click()}><ImagePlus size={17} />Photo</button>
     </div>
     <small style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>Alignez l’IMEI ou S/N dans la fente. Si la caméra intégrée ne s’ouvre pas, prenez une photo avec l’appareil. La première lecture OCR nécessite Internet.</small>

@@ -39,9 +39,14 @@ export function CameraCapture({ onCapture, onClose, mode = 'product' }: { onCapt
     return () => { closed.current = true; stream.current?.getTracks().forEach(track => track.stop()); document.removeEventListener('keydown', escape, true); previousFocus?.focus(); };
   }, [onClose]);
   const startCamera = async () => {
+    // On some iPhone browser containers getUserMedia is absent although the
+    // system camera picker remains available. Keep the user's click gesture.
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      nativeCamera.current?.click();
+      return;
+    }
     setError(''); setReady(false); setStarting(true);
     try {
-      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('camera-unavailable');
       stopCamera();
       let opened: MediaStream;
       try { opened = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }); }
