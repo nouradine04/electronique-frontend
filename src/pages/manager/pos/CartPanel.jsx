@@ -3,8 +3,9 @@ import { Plus, Minus, Trash2, ShoppingCart, Package } from 'lucide-react';
 import { LocalImage } from '../../../components/common/LocalImage.jsx';
 
 import { variantLabel, BRAND } from './constants';
+import { shortIdentifier } from './search.js';
 
-export function CartPanel({ cart, cartItems, updateQty, removeFromCart, cartTotal, setShowPaymentModal }) {
+export function CartPanel({ cart, cartItems, cartUnitLabels, updateQty, removeFromCart, cartTotal, setShowPaymentModal }) {
   return (
 <div style={{ width: '340px', borderLeft: '1px solid var(--border-color)', backgroundColor: 'var(--bg-surface)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -32,6 +33,7 @@ export function CartPanel({ cart, cartItems, updateQty, removeFromCart, cartTota
                       {item.product.name}
                     </div>
                     <div className="pos-variant">{variantLabel(item.product)}</div>
+                    {item.unitIds?.length > 0 && <div className="pos-cart-imeis">{item.unitIds.map(id => <span key={id} title={cartUnitLabels.get(id) || ''}>{shortIdentifier(cartUnitLabels.get(id) || '')}</span>)}</div>}
                     <div style={{ fontSize: '13px', color: BRAND, fontWeight: 700 }}>
                       {(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA
                     </div>

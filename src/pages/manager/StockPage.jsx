@@ -1,5 +1,6 @@
-import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
-import React, { useState, useEffect } from 'react';
+import { useExactUnitMatch, useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
+import React, { useState, useEffect, useRef } from 'react';
+import { normalizeIdentifierSearch } from '../../services/productUnits';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, queryStockMovements, updateProduct } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
@@ -26,6 +27,8 @@ export function ManagerStockPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
+  const exactUnit = useExactUnitMatch(currentShop?.id, searchQuery);
+  const lastOpenedUnit = useRef('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'LOW' | 'OUT'
   const [activeView, setActiveView] = useState('inventory');
@@ -41,6 +44,19 @@ export function ManagerStockPage() {
   const [productFormModal, setProductFormModal] = useState({ open: false, product: null });
 
   const [selectedProductId, setSelectedProductId] = useState(null);
+  useEffect(() => {
+    const identifier = normalizeIdentifierSearch(searchQuery);
+    const key = `${currentShop?.id}:${identifier}`;
+    if (!exactUnit || exactUnit.identifier !== identifier || selectedProductId || lastOpenedUnit.current === key) return;
+    const timer = setTimeout(() => {
+      lastOpenedUnit.current = key;
+      setActiveView('inventory');
+      setSelectedCategory('ALL');
+      setStatusFilter('ALL');
+      setSelectedProductId(exactUnit.product_id);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [currentShop?.id, exactUnit?.id, exactUnit?.identifier, exactUnit?.product_id, searchQuery, selectedProductId]);
 
   // Requête WatermelonDB réactive sur le stock de la boutique active
   const categories = useQuery(queryCategories(currentShop?.id || '')) || [];
@@ -136,7 +152,7 @@ export function ManagerStockPage() {
   const totalUnits = products.reduce((sum, product) => sum + Number(product.quantity || 0), 0);
 
   if (selectedProductId) {
-    return <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
+    return <ProductDetailPage initialUnitSearch={exactUnit?.product_id === selectedProductId ? searchQuery : unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
   }
 
   return (

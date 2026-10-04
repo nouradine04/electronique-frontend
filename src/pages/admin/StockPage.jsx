@@ -1,5 +1,5 @@
-import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
-import React, { useEffect, useState } from 'react';
+import { useExactUnitMatch, useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, updateProduct } from '../../db/queries.js';
@@ -7,6 +7,8 @@ import { useShop } from '../../context/ShopContext.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { LocalImage } from '../../components/common/LocalImage.jsx';
+import { calculateStockFinance, filterStockProducts } from './stockFinance.js';
+import { normalizeIdentifierSearch } from '../../services/productUnits';
 import { Search, ChevronRight, Package, AlertCircle, X, DollarSign, Save, Check, ArrowDown, Clock3, CircleX } from 'lucide-react';
 import './stock.css';
 
@@ -15,6 +17,8 @@ export function AdminStockPage() {
   const { currentShop } = useShop();
   const [searchQuery, setSearchQuery] = useState('');
   const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
+  const exactUnit = useExactUnitMatch(currentShop?.id, searchQuery);
+  const lastOpenedUnit = useRef('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedProductForPrice, setSelectedProductForPrice] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -23,24 +27,29 @@ export function AdminStockPage() {
   const categories = useQuery(queryCategories(currentShop?.id || '')) || [];
   const products = useQuery(queryProducts(currentShop?.id || '')) || [];
 
-  const pendingProducts = products.filter(p => p.status === 'PENDING_PRICE');
-
-  const filteredProducts = products.filter(p => {
-    const q = String(searchQuery || '').toLowerCase();
-    const nameStr = String(p.name || '').toLowerCase();
-    const catStr = String(categories.find(category => category.id === p.categoryId)?.name || '').toLowerCase();
-    const matchesSearch = unitMatches.has(p.id) || nameStr.includes(q) || catStr.includes(q);
-    const matchesCategory = selectedCategory === 'ALL' || p.categoryId === selectedCategory;
-    return unitMatches.has(p.id) || (matchesSearch && matchesCategory);
-  });
+  const filteredProducts = filterStockProducts(products, categories, selectedCategory, searchQuery, unitMatches);
+  const pendingProducts = filteredProducts.filter(product => product.status === 'PENDING_PRICE');
+  const { saleValue, purchaseCost, margin, marginPercent, unpricedCount } = calculateStockFinance(filteredProducts);
+  const money = value => value.toLocaleString('fr-FR', { maximumFractionDigits: 0 });
   const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
   const paginatedProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   useEffect(() => setCurrentPage(1), [searchQuery, selectedCategory, currentShop?.id]);
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
+  useEffect(() => {
+    const identifier = normalizeIdentifierSearch(searchQuery);
+    const key = `${currentShop?.id}:${identifier}`;
+    if (!exactUnit || exactUnit.identifier !== identifier || selectedProductId || lastOpenedUnit.current === key) return;
+    const timer = setTimeout(() => {
+      lastOpenedUnit.current = key;
+      setSelectedCategory('ALL');
+      setSelectedProductId(exactUnit.product_id);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [currentShop?.id, exactUnit?.id, exactUnit?.identifier, exactUnit?.product_id, searchQuery, selectedProductId]);
 
   if (selectedProductId) {
-    return <ProductDetailPage initialUnitSearch={unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
+    return <ProductDetailPage initialUnitSearch={exactUnit?.product_id === selectedProductId ? searchQuery : unitMatches.has(selectedProductId) ? searchQuery : ''} productId={selectedProductId} onBack={() => setSelectedProductId(null)} />;
   }
 
   return (
@@ -64,11 +73,6 @@ export function AdminStockPage() {
         </div>
       </div>
 
-      {/* Category Filter */}
-      <div className="as-stock-value">
-        <div><span>Valeur du stock · prix de vente</span><strong>{filteredProducts.reduce((sum, product) => sum + Number(product.quantity || 0) * Number(product.price || 0), 0).toLocaleString('fr-FR')} <small>FCFA</small></strong></div>
-        <div><span>Coût d’achat du stock</span><strong>{filteredProducts.reduce((sum, product) => sum + Number(product.quantity || 0) * Number(product.unitCost || 0), 0).toLocaleString('fr-FR')} <small>FCFA</small></strong></div>
-      </div>
       <div className="as-category-toolbar">
       <div className="as-filters">
         <button
@@ -88,6 +92,13 @@ export function AdminStockPage() {
         ))}
       </div>
       </div>
+
+      <section className="as-stock-value" aria-label="Estimation financière du stock filtré">
+        <div><span>Valeur de vente du stock</span><strong>{money(saleValue)} <small>FCFA</small></strong></div>
+        <div><span>Coût d’achat du stock</span><strong>{money(purchaseCost)} <small>FCFA</small></strong></div>
+        <div className={`as-margin${margin < 0 ? ' is-negative' : ''}`}><span>Marge bénéficiaire estimée</span><strong>{money(margin)} <small>FCFA</small></strong><small className="as-margin-rate">{marginPercent === null ? 'Taux non disponible' : `${marginPercent.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} % du coût d’achat`}</small></div>
+        {unpricedCount > 0 && <p className="as-finance-note">{unpricedCount} produit{unpricedCount > 1 ? 's' : ''} en stock sans prix de vente exclu{unpricedCount > 1 ? 's' : ''} de cette estimation.</p>}
+      </section>
 
       {/* Pending Products Banner */}
       {pendingProducts.length > 0 && (
@@ -141,7 +152,7 @@ export function AdminStockPage() {
                     <span className="as-product-image">
                       <LocalImage src={product.imageUrl || product.image_url} alt="" fallback={<Package size={20} />} />
                     </span>
-                    <span className="as-product-copy"><strong>{product.name}</strong><small>{product.sku || categories.find(category => category.id === product.categoryId)?.name || 'Sans référence'}</small></span>
+                    <span className="as-product-copy"><strong>{product.name}</strong><small>{categories.find(category => category.id === product.categoryId)?.name || 'Produit'}</small></span>
                   </span>
                   <strong className="as-price" role="cell">{isPending ? 'Prix à définir' : `${Number(product.price || 0).toLocaleString('fr-FR')} FCFA`}<small className="as-unit-label"> / unité</small></strong>
                   <span className="as-quantity" role="cell"><strong>{Number(product.quantity || 0)}</strong><small>pièce{Number(product.quantity || 0) > 1 ? 's' : ''}</small></span>

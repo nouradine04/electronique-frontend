@@ -215,6 +215,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+.product-tile-variant { color:#657184;font-size:11px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .product-tile-bottom {
   display: flex;
   flex-wrap: wrap;

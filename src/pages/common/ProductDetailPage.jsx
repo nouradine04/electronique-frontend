@@ -1,4 +1,5 @@
 import { UnitInventory } from '../../components/stock/UnitInventory';
+import { ProductSalesHistory } from '../../components/stock/ProductSalesHistory';
 import React, { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -22,9 +23,9 @@ function formatMoney(value) {
 }
 
 function movementLabel(movement) {
-  if (movement.type === 'IN') return String(movement.reason || '').startsWith('Retour client') ? 'Retour' : 'Entrée';
+  if (movement.type === 'IN') return String(movement.reason || '').startsWith('Retour client') ? 'Retour client' : movement.reason === 'Stock initial' ? 'Stock initial' : 'Entrée en stock';
   if (movement.type === 'OUT') return !movement.reason || String(movement.reason).toLowerCase().includes('vente') ? 'Vente' : 'Sortie';
-  return 'Ajustement';
+  return 'Stock corrigé';
 }
 
 export function ProductDetailPage({ productId, onBack, onEdit, onDelete, initialUnitSearch = '' }) {
@@ -41,21 +42,13 @@ export function ProductDetailPage({ productId, onBack, onEdit, onDelete, initial
   const filteredMovements = movements.filter(item => filterType === 'ALL' || item.type === filterType);
   const totalIn = movements.filter(item => item.type === 'IN').reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   const totalOut = movements.filter(item => item.type === 'OUT').reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  const adjustmentCount = movements.filter(item => item.type === 'ADJUST').length;
   const out = Number(product.quantity || 0) === 0;
   const low = !out && Number(product.quantity || 0) <= Number(product.minStock || 0);
   const status = out ? { label: 'Rupture', className: 'out', Icon: XCircle } : low ? { label: 'Stock faible', className: 'low', Icon: AlertTriangle } : { label: 'En stock', className: 'ok', Icon: CheckCircle2 };
   const StatusIcon = status.Icon;
 
-  let custom = [];
-  try {
-    const parsed = JSON.parse(product.specsJson || '{}');
-    custom = Array.isArray(parsed.custom_fields) ? parsed.custom_fields.map(field => [field.label, field.value]) : [];
-  } catch { custom = []; }
-  const specifications = [
-    ['Marque', product.brand], ['Modèle', product.model], ['RAM', product.ram], ['Capacité', product.storageCapacity],
-    ['Couleur', product.color], ['SIM', product.simType], ['Batterie', product.battery], ['Écran', product.screen],
-    ['Système', product.operatingSystem], ['Sortie', product.releaseDate ? formatDate(product.releaseDate) : ''], ...custom,
-  ].filter(([, value]) => Boolean(value));
+  const specifications = [['Capacité', product.storageCapacity], ['Couleur', product.color], ['SIM', product.simType]].filter(([, value]) => Boolean(value));
 
   return <Dialog.Root open onOpenChange={open => !open && onBack()}>
     <Dialog.Portal>
@@ -66,15 +59,16 @@ export function ProductDetailPage({ productId, onBack, onEdit, onDelete, initial
             <div className="pd-thumb">{product.imageUrl ? <LocalImage src={product.imageUrl} alt="" /> : <Package size={23} />}</div>
             <div className="pd-heading">
               <Dialog.Title>{product.name}</Dialog.Title>
-              <Dialog.Description>{product.sku || 'Sans référence'}</Dialog.Description>
+              <Dialog.Description>Fiche produit</Dialog.Description>
             </div>
             <span className={`pd-status ${status.className}`}><StatusIcon size={14} />{status.label}</span>
             <Dialog.Close className="pd-close" aria-label="Fermer"><X size={18} /></Dialog.Close>
           </header>
 
-          <div className="pd-summary">
+          <div className={`pd-summary${isOwner ? ' owner' : ''}`}>
             <div><span>Disponible</span><strong>{product.quantity} <small>pièce{Number(product.quantity) > 1 ? 's' : ''}</small></strong></div>
             <div><span>Prix de vente</span><strong>{formatMoney(product.price)}</strong></div>
+            {isOwner && <div><span>Coût d’achat</span><strong className="pd-purchase-value">{formatMoney(product.unitCost)}</strong></div>}
             <div><span>Emplacement</span><strong><MapPin size={14} />{product.location || 'Non défini'}</strong></div>
           </div>
 
@@ -83,6 +77,7 @@ export function ProductDetailPage({ productId, onBack, onEdit, onDelete, initial
               {product.trackingMode !== 'QUANTITY' && <Tabs.Trigger value="units">Appareils</Tabs.Trigger>}
               <Tabs.Trigger value="information">Informations</Tabs.Trigger>
               <Tabs.Trigger value="movements">Mouvements <span>{movements.length}</span></Tabs.Trigger>
+              <Tabs.Trigger value="sales">Ventes</Tabs.Trigger>
             </Tabs.List>
 
             {product.trackingMode !== 'QUANTITY' && <Tabs.Content value="units"><UnitInventory key={`${product.id}:${initialUnitSearch}`} product={product} userName={userName} initialSearch={initialUnitSearch} /></Tabs.Content>}
@@ -94,24 +89,25 @@ export function ProductDetailPage({ productId, onBack, onEdit, onDelete, initial
                   {specifications.length ? <dl className="pd-specs">{specifications.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl> : <p className="pd-muted">Aucune caractéristique renseignée.</p>}
                 </section>
                 <div className="pd-meta">
-                  <span>Seuil d’alerte <strong>{product.minStock || 0}</strong></span>
+                  <span>Seuil d’alerte <strong className="pd-alert-value">{product.minStock || 0}</strong></span>
                   <span>Ajouté par <strong>{product.addedBy || 'Non renseigné'}</strong></span>
                   <span>Date d’ajout <strong>{formatDate(product.addedAt)}</strong></span>
-                  {isOwner && <span>Coût d’achat <strong>{formatMoney(product.unitCost)}</strong></span>}
+                  {product.sku && <span>Référence interne <strong className="pd-reference">{product.sku}</strong></span>}
                 </div>
               </motion.div>
             </Tabs.Content>
 
             <Tabs.Content value="movements" asChild>
               <motion.div className="pd-content" initial={reducedMotion ? false : { opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}>
-                <div className="pd-flow"><span><TrendingUp size={16} />Entrées <strong>{totalIn}</strong></span><span><TrendingDown size={16} />Sorties <strong>{totalOut}</strong></span></div>
-                <div className="pd-filters">{[['ALL', 'Tous'], ['IN', 'Entrées'], ['OUT', 'Sorties']].map(([value, label]) => <button type="button" key={value} className={filterType === value ? 'active' : ''} onClick={() => setFilterType(value)}>{label}</button>)}</div>
+                <div className="pd-flow"><span className="pd-flow-in"><TrendingUp size={16} />Entrées <strong>{totalIn}</strong></span><span className="pd-flow-out"><TrendingDown size={16} />Sorties <strong>{totalOut}</strong></span>{adjustmentCount > 0 && <span>Corrections <strong>{adjustmentCount}</strong></span>}</div>
+                <div className="pd-filters">{[['ALL', 'Tous'], ['IN', 'Entrées'], ['OUT', 'Sorties'], ...(adjustmentCount ? [['ADJUST', 'Corrections']] : [])].map(([value, label]) => <button type="button" key={value} className={filterType === value ? 'active' : ''} onClick={() => setFilterType(value)}>{label}</button>)}</div>
                 <div className="pd-movements">{filteredMovements.length ? filteredMovements.map(item => {
                   const incoming = item.type === 'IN';
-                  return <div className="pd-movement" key={item.id}><span className={incoming ? 'in' : item.type === 'OUT' ? 'out' : 'adjust'}>{incoming ? '+' : item.type === 'OUT' ? '−' : '='}{item.quantity}</span><div><strong>{movementLabel(item)}</strong><small>{item.reason || (item.type === 'OUT' ? 'Vente enregistrée' : 'Mouvement manuel')} · {item.userName || 'Utilisateur'}</small></div><time>{formatDate(item.date, true)}</time></div>;
+                  return <div className="pd-movement" key={item.id}><span className={incoming ? 'in' : item.type === 'OUT' ? 'out' : 'adjust'}>{incoming ? '+' : item.type === 'OUT' ? '−' : '='}{item.quantity}</span><div><strong>{movementLabel(item)}</strong><small>{item.reason && item.reason !== movementLabel(item) ? `${item.reason} · ` : ''}{item.userName || 'Utilisateur'}</small></div><time>{formatDate(item.date, true)}</time></div>;
                 }) : <p className="pd-muted">Aucun mouvement enregistré.</p>}</div>
               </motion.div>
             </Tabs.Content>
+            <Tabs.Content value="sales"><ProductSalesHistory shopId={product.shopId} productId={product.id} /></Tabs.Content>
           </Tabs.Root>
 
           <footer className="pd-footer">

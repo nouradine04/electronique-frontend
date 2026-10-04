@@ -3,6 +3,8 @@ import { ProductGrid } from './pos/ProductGrid';
 import { CartPanel } from './pos/CartPanel';
 import { PaymentModal } from './pos/PaymentModal';
 import { SaleReceipt } from './pos/SaleReceipt';
+import { PosUnitSelector } from './pos/PosUnitSelector';
+import { shortIdentifier } from './pos/search.js';
 import { variantLabel, BRAND } from './pos/constants';
 
 import { Plus, Minus, ShoppingCart, X, Package } from 'lucide-react';
@@ -18,9 +20,14 @@ export function PosPage({ setActiveTab }) {
     filteredProducts,
     productPage,
     addToCart,
+    selectingProduct,
+    unitSelection,
+    setUnitSelection,
+    addTrackedUnit,
     cart,
     isMobile,
     cartItems,
+    cartUnitLabels,
     updateQty,
     removeFromCart,
     cartTotal,
@@ -28,7 +35,6 @@ export function PosPage({ setActiveTab }) {
     setShowCartSheet,
     showCartSheet,
     showPaymentModal,
-    setCart,
     paymentMethods,
     paymentMethod,
     setPaymentMethod,
@@ -74,11 +80,21 @@ export function PosPage({ setActiveTab }) {
         cart={cart}
       />
 
+      {selectingProduct && <PosUnitSelector
+        product={selectingProduct}
+        selected={cart.find(item => item.productId === selectingProduct.id)?.unitIds || []}
+        suggestedUnitId={unitSelection?.suggestedUnitId || ''}
+        suffix={unitSelection?.suffix || ''}
+        onSelect={addTrackedUnit}
+        onClose={() => setUnitSelection(null)}
+      />}
+
       {/* ── Cart Panel (desktop) ── */}
       {!isMobile && (
         <CartPanel
           cart={cart}
           cartItems={cartItems}
+          cartUnitLabels={cartUnitLabels}
           updateQty={updateQty}
           removeFromCart={removeFromCart}
           cartTotal={cartTotal}
@@ -115,7 +131,7 @@ export function PosPage({ setActiveTab }) {
             <div className="pos-mobile-cart-items">
               {cartItems.map(item => <article key={item.productId}>
                 <span className="pos-cart-photo"><LocalImage src={item.product.imageUrl || item.product.image_url} alt="" fallback={<Package size={18} />} /></span>
-                <div><strong>{item.product.name}</strong><small>{variantLabel(item.product)}</small><b>{(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA</b></div>
+                <div><strong>{item.product.name}</strong><small>{item.unitIds?.length ? item.unitIds.map(id => shortIdentifier(cartUnitLabels.get(id) || '')).join(' · ') : variantLabel(item.product)}</small><b>{(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA</b></div>
                 <div className="pos-mobile-quantity">
                   <button type="button" onClick={() => updateQty(item.productId, -1)}><Minus size={14} /></button>
                   <span>{item.quantity}</span>
@@ -137,7 +153,6 @@ export function PosPage({ setActiveTab }) {
           setShowPaymentModal={setShowPaymentModal}
           cartTotal={cartTotal}
           cartItems={cartItems}
-          setCart={setCart}
           paymentMethods={paymentMethods}
           paymentMethod={paymentMethod}
           setPaymentMethod={setPaymentMethod}

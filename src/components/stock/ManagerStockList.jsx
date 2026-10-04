@@ -17,7 +17,7 @@ export function ManagerStockList({ products, onView, onMovement, onEdit }) {
     return <article className="ms-inventory-row" role="row" key={product.id}>
       <button className="ms-item" role="cell" onClick={() => onView(product.id)} aria-label={`Voir la fiche de ${product.name}`}>
         <span className="ms-item-image">{product.imageUrl ? <LocalImage src={product.imageUrl} alt="" /> : <Package size={22} />}</span>
-        <span className="ms-item-copy"><strong>{product.name}</strong><small>{product.sku || 'Sans référence'}{!pending && product.price ? ` · ${Number(product.price).toLocaleString('fr-FR')} FCFA` : ''}</small></span>
+        <span className="ms-item-copy"><strong>{product.name}</strong><small>{!pending && product.price ? `${Number(product.price).toLocaleString('fr-FR')} FCFA` : 'Prix à définir'}</small></span>
       </button>
       <div className="ms-location" role="cell"><MapPin size={15} /><span>{product.location || 'Non indiqué'}</span></div>
       <div className="ms-quantity" role="cell"><strong>{Number(product.quantity || 0)}</strong><span>pièce{Number(product.quantity || 0) > 1 ? 's' : ''}</span><small>Seuil : {minimum}</small></div>

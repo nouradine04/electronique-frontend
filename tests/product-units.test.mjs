@@ -37,6 +37,9 @@ test('identical phones remain distinct units; search finds a sold IMEI and sale 
  const search=normalizeIdentifierSearch(units[0]._raw.identifier.replace(/(.{5})/g,'$1 '));
  const found=await db.get('product_units').query(Q.where('shop_id','shop'),Q.where('identifier',Q.like(`${Q.sanitizeLikeString(search)}%`))).fetch();
  assert.equal(found[0].id,units[0].id);
+ const bySuffix=await db.get('product_units').query(Q.where('shop_id','shop'),Q.where('state','AVAILABLE'),Q.where('identifier',Q.like('%3809'))).fetch();
+ assert.equal(bySuffix.length,1);
+ assert.equal(bySuffix[0]._raw.identifier,'356938035643809');
  await assert.rejects(validateSelectedUnits(db,product,[units[0].id],1),/disponible/);
  await assert.rejects(db.write(async()=>await prepareReceivedUnits(db,product,units[0]._raw.identifier,1)),/existe déjà/);
  assert.throws(()=>parseIdentifiers('490154203237518\n490154203237518','IMEI'),/plusieurs fois/);

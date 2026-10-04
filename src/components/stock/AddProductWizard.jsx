@@ -3,7 +3,7 @@ import { IdentifierPhotoReader } from './IdentifierPhotoReader';
 import { parseIdentifiers } from '../../services/productUnits';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CameraCapture } from './CameraCapture';
-import { Camera, LoaderCircle, Plus, Search, Smartphone, Trash2, Upload, X, Package, Wallet, ClipboardCheck, Pencil } from 'lucide-react';
+import { Camera, LoaderCircle, Search, Smartphone, Upload, X, Package, Wallet, ClipboardCheck, Pencil } from 'lucide-react';
 import { useShop } from '../../context/ShopContext.jsx';
 import { LocalImage } from '../common/LocalImage.jsx';
 import { cacheCatalogImage, saveLocalImage, uploadLocalImage } from '../../services/localMedia.js';
@@ -382,10 +382,6 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
   const colorOptions = Array.from(new Set([formData.color, ...catalogOptions.colors, ...DEFAULT_PHONE_COLORS].filter(Boolean)));
   const hasCatalogSelection = Boolean(formData.catalog_id) && catalogStatus !== 'manual';
 
-  const updateCustomSpec = (index, key, value) => {
-    setCustomSpecs(previous => previous.map((field, position) => position === index ? { ...field, [key]: value } : field));
-  };
-
   return (
     <div className="wizard-overlay" onMouseDown={event => event.target === event.currentTarget && onClose()} style={{
       position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
@@ -434,7 +430,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
                     <span style={{ flex: 1 }}>
                       <strong>{phone.brand} {phone.model}</strong>
                       <span style={{ display: 'block', marginTop: '2px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {[phone.ram, phone.storage].filter(Boolean).join(' · ') || 'Caractéristiques à compléter'}
+                        {phone.storage || 'Capacité à préciser'}
                       </span>
                     </span>
                   </button>
@@ -484,31 +480,8 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
                   {colorOptions.map(option => <option key={option} value={option}>{option}</option>)}
                 </select>
               </div>
+              <div><label style={labelStyle}>SIM</label><select name="sim_type" value={formData.sim_type} onChange={handleChange} style={inputStyle}><option value="">À préciser</option><option value="SIM simple">SIM simple</option><option value="Double SIM">Double SIM</option><option value="Nano-SIM + eSIM">Nano-SIM + eSIM</option><option value="eSIM">eSIM</option></select></div>
             </div>
-            <details className="wizard-optional" style={{ marginTop: '14px' }}>
-              <summary>Plus de caractéristiques · facultatif</summary>
-              <div className="wizard-field-grid" style={{ marginTop: '14px', ...responsiveGrid }}>
-                <div><label style={labelStyle}>Marque</label><input name="brand" value={formData.brand} onChange={handleChange} placeholder="Samsung" style={inputStyle} /></div>
-                <div><label style={labelStyle}>Modèle</label><input name="model" value={formData.model} onChange={handleChange} placeholder="Galaxy S24" style={inputStyle} /></div>
-                {variantField('RAM', 'ram', catalogOptions.ram, '8 GB')}
-                <div><label style={labelStyle}>SIM</label><select name="sim_type" value={formData.sim_type} onChange={handleChange} style={inputStyle}><option value="">À préciser</option><option value="SIM simple">SIM simple</option><option value="Double SIM">Double SIM</option><option value="Nano-SIM + eSIM">Nano-SIM + eSIM</option><option value="eSIM">eSIM</option></select></div>
-              </div>
-            <div style={{ marginTop: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: customSpecs.length ? '10px' : 0 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Autres caractéristiques</span>
-                <button type="button" onClick={() => setCustomSpecs(previous => [...previous, { label: '', value: '' }])} className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <Plus size={14} /> Ajouter un champ
-                </button>
-              </div>
-              {customSpecs.map((field, index) => (
-                <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) 36px', gap: '8px', marginTop: '8px' }}>
-                  <input value={field.label} onChange={event => updateCustomSpec(index, 'label', event.target.value)} placeholder="Ex : Garantie" style={inputStyle} />
-                  <input value={field.value} onChange={event => updateCustomSpec(index, 'value', event.target.value)} placeholder="Ex : 12 mois" style={inputStyle} />
-                  <button type="button" aria-label="Supprimer la caractéristique" onClick={() => setCustomSpecs(previous => previous.filter((_, position) => position !== index))} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)', color: 'var(--danger)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Trash2 size={16} /></button>
-                </div>
-              ))}
-            </div>
-            </details>
           </section>}
 
           {step === 1 && <details className="wizard-optional"><summary><Camera size={16} /> Photo, emplacement et description</summary><div className="product-presentation">
@@ -578,7 +551,7 @@ export function AddProductWizard({ categories, onClose, onSubmit, initialData = 
             <div className="wizard-step-heading"><strong>Tout est correct ?</strong><span>Vérifiez votre fiche avant de l’enregistrer.</span></div>
             <div className="product-review">
               <div className="product-review-title">{formData.image_url && <LocalImage src={formData.image_url} alt="Produit" />}<div><strong>{formData.name}</strong><p>{selectedCategory?.name}</p></div><button type="button" onClick={() => setStep(1)} aria-label="Modifier le produit"><Pencil size={18} /></button></div>
-              <dl>{[['Marque / modèle', [formData.brand, formData.model].filter(Boolean).join(' ')], ['Variante', [formData.storage_capacity, formData.ram, formData.color, formData.sim_type].filter(Boolean).join(' · ')], ['Emplacement', formData.location], ['Description', formData.description], ['Batterie', formData.battery], ['Écran', formData.screen], ['Système', formData.operating_system], ['Date de sortie', formData.release_date], ...customSpecs.map(field => [field.label, field.value])].filter(([,value]) => value).map(([label,value],i) => <div key={i}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+              <dl>{[['Capacité', formData.storage_capacity], ['Couleur', formData.color], ['SIM', formData.sim_type], ['Emplacement', formData.location], ['Description', formData.description]].filter(([,value]) => value).map(([label,value],i) => <div key={i}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
               {!catalogOnly && <><div className="product-review-title"><strong>Stock {isOwner ? 'et prix' : ''}</strong><button type="button" onClick={() => setStep(2)} aria-label="Modifier le stock et les prix"><Pencil size={18} /></button></div>
               <dl>{[['Quantité', formData.quantity], ['Seuil d’alerte', formData.min_stock], ...(isOwner ? [['Coût d’achat', `${Number(formData.unit_cost).toLocaleString('fr-FR')} FCFA`], ['Prix de vente', `${Number(formData.price).toLocaleString('fr-FR')} FCFA`]] : [])].map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
               {!isOwner && <p>L’administrateur validera le produit et ses prix avant sa mise en vente.</p>}</>}

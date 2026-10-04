@@ -16,7 +16,7 @@ export function ProductGrid({ searchQuery, setSearchQuery, filteredProducts, pro
               type="text"
               className="input-field"
               style={{ paddingLeft: '40px', height: '40px' }}
-              placeholder="Produit, IMEI ou numéro de série…"
+              placeholder="Produit + 4 derniers chiffres de l’IMEI…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -32,17 +32,18 @@ export function ProductGrid({ searchQuery, setSearchQuery, filteredProducts, pro
             </div>
           ) : (
             <div className="pos-products-grid">
-              {productPage.items.map(product => (
-                <button type="button" key={product.id} className="pos-product-card" onClick={() => addToCart(product)} aria-label={`Ajouter ${product.name}, ${variantLabel(product)}, ${product.price} FCFA`}>
+              {productPage.items.map(product => {
+                const [name, ...variantParts] = String(product.name || '').split(' · ');
+                const variant = variantParts.join(' · ') || variantLabel(product);
+                const tracked = product.trackingMode !== 'QUANTITY';
+                return (
+                <button type="button" key={product.id} className="pos-product-card" onClick={() => addToCart(product)} aria-label={`${tracked ? 'Choisir un appareil pour' : 'Ajouter'} ${product.name}, ${product.price} FCFA`}>
                   <div className="pos-product-photo"><LocalImage src={product.imageUrl || product.image_url} alt="" fallback={<Package size={30} />} /></div>
                   <div style={{ padding: '16px' }}>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px', lineHeight: 1.3 }}>
-                      {product.name}
+                      {name}
                     </div>
-                    <div className="pos-variant">{variantLabel(product) || 'Caractéristiques non renseignées'}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
-                      {product.sku || 'Sans SKU'}
-                    </div>
+                    <div className="pos-variant">{variant || 'Caractéristiques non renseignées'}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontWeight: 800, fontSize: '16px', color: BRAND }}>
                         {Number(product.price).toLocaleString('fr-FR')} <span style={{ fontSize: '11px', fontWeight: 600 }}>FCFA</span>
@@ -57,9 +58,9 @@ export function ProductGrid({ searchQuery, setSearchQuery, filteredProducts, pro
                     </div>
                   </div>
                   <div style={{ height: '3px', backgroundColor: BRAND, opacity: 0.2 }} />
-                  <span className="pos-add-label"><Plus size={14} /> Ajouter{cart.find(item => item.productId === product.id) ? ` · ${cart.find(item => item.productId === product.id).quantity} au panier` : ''}</span>
+                  <span className="pos-add-label"><Plus size={14} /> {tracked ? 'Choisir un appareil' : 'Ajouter'}{cart.find(item => item.productId === product.id) ? ` · ${cart.find(item => item.productId === product.id).quantity} au panier` : ''}</span>
                 </button>
-              ))}
+              );})}
             </div>
           )}
           <Pagination {...productPage.props} itemLabel="produit" />

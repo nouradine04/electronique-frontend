@@ -1,5 +1,6 @@
 import { useUnitProductMatches } from '../../../components/stock/useUnitProductMatches';
-import { variantLabel } from './constants';
+import { matchesPosProduct, parsePosSearch } from './search.js';
+import { addTrackedUnitToCart } from './cartUnits.js';
 
 import { validateSelectedUnits, prepareUnitEvent, unitRaw } from '../../../services/productUnits';
 import { prepareCheckoutOperation } from '../../../services/operationQueue';
@@ -9,6 +10,7 @@ import { useShop } from '../../../context/ShopContext.jsx';
 import { queryProductsInStock, queryClients, database } from '../../../db/queries.js';
 import { Banknote, Smartphone, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Q } from '@nozbe/watermelondb';
 
 import { usePagination } from '../../../components/ui/usePagination.js';
 export function usePos({ setActiveTab }) {
@@ -24,8 +26,15 @@ export function usePos({ setActiveTab }) {
 
   // POS State
   const [searchQuery, setSearchQuery] = useState('');
-  const unitMatches = useUnitProductMatches(currentShop?.id || '', searchQuery, 'AVAILABLE');
+  const { productText, imeiSuffix } = parsePosSearch(searchQuery);
+  const unitMatches = useUnitProductMatches(currentShop?.id || '', imeiSuffix ? '' : searchQuery, 'AVAILABLE');
+  const suffixUnits = useQuery(currentShop?.id && imeiSuffix ? database.get('product_units').query(
+    Q.where('shop_id', currentShop.id), Q.where('state', 'AVAILABLE'),
+    Q.where('identifier', Q.like(`%${Q.sanitizeLikeString(imeiSuffix)}`)),
+  ) : null);
   const [cart, setCart] = useState([]);
+  const [unitSelection, setUnitSelection] = useState(null);
+  const lastSuggestedSearch = useRef('');
   const [showCartSheet, setShowCartSheet] = useState(false);
 
   const checkoutLock = useRef(false);
@@ -56,19 +65,35 @@ export function usePos({ setActiveTab }) {
   ) || [];
 
   const productsById = useMemo(() => new Map(allProducts.map(product => [product.id, product])), [allProducts]);
+  const selectingProduct = unitSelection ? productsById.get(unitSelection.productId) : null;
   const cartItems = useMemo(() => cart
     .map(item => ({ ...item, product: productsById.get(item.productId) }))
     .filter(item => item.product), [cart, productsById]);
+  const cartUnitIds = cart.flatMap(item => item.unitIds || []);
+  const cartUnits = useQuery(currentShop?.id && cartUnitIds.length ? database.get('product_units').query(
+    Q.where('shop_id', currentShop.id), Q.where('id', Q.oneOf(cartUnitIds)),
+  ) : null);
+  const cartUnitLabels = new Map(cartUnits.map(unit => [unit.id, unitRaw(unit).identifier]));
 
   const filteredProducts = useMemo(() => {
-    const q = (searchQuery || '').toLowerCase();
+    const suffixProductIds = new Set(suffixUnits.map(unit => unitRaw(unit).product_id));
     return allProducts.filter(p => {
       if (String(p.status || '').toUpperCase() !== 'ACTIVE' || Number(p.price || 0) <= 0) return false;
-      const n = (p.name || '').toLowerCase();
-      const s = (p.sku || '').toLowerCase();
-      return unitMatches.has(p.id) || `${n} ${s} ${variantLabel(p)}`.toLowerCase().includes(q);
+      if (imeiSuffix) return suffixProductIds.has(p.id) && matchesPosProduct(p, productText);
+      return unitMatches.has(p.id) || matchesPosProduct(p, productText);
     });
-  }, [allProducts, searchQuery, unitMatches]);
+  }, [allProducts, productText, imeiSuffix, suffixUnits, unitMatches]);
+  useEffect(() => {
+    if (!imeiSuffix || unitSelection) return;
+    const eligible = suffixUnits.filter(unit => filteredProducts.some(product => product.id === unitRaw(unit).product_id));
+    const key = `${currentShop?.id}:${searchQuery.trim()}`;
+    if (eligible.length !== 1 || lastSuggestedSearch.current === key) return;
+    const timer = setTimeout(() => {
+      lastSuggestedSearch.current = key;
+      setUnitSelection({ productId: unitRaw(eligible[0]).product_id, suggestedUnitId: eligible[0].id, suffix: imeiSuffix });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [currentShop?.id, filteredProducts, imeiSuffix, searchQuery, suffixUnits, unitSelection]);
   const productPage = usePagination(filteredProducts, `${currentShop?.id}:${searchQuery}`);
 
   const filteredClients = useMemo(() => {
@@ -86,6 +111,10 @@ export function usePos({ setActiveTab }) {
   );
 
   const addToCart = useCallback((product) => {
+    if (product.trackingMode !== 'QUANTITY') {
+      setUnitSelection({ productId: product.id, suggestedUnitId: '', suffix: imeiSuffix });
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(i => i.productId === product.id);
       if (existing) {
@@ -95,14 +124,30 @@ export function usePos({ setActiveTab }) {
       }
       return [...prev, { productId: product.id, quantity: 1 }];
     });
-  }, []);
+  }, [imeiSuffix]);
+
+  const addTrackedUnit = useCallback((unitId) => {
+    const product = productsById.get(unitSelection?.productId);
+    if (!product || product.trackingMode === 'QUANTITY') return;
+    setCart(previous => addTrackedUnitToCart(previous, product, unitId));
+    setUnitSelection(null);
+  }, [productsById, unitSelection?.productId]);
 
   const updateQty = useCallback((productId, delta) => {
+    if (productsById.get(productId)?.trackingMode !== 'QUANTITY') {
+      if (delta > 0) setUnitSelection({ productId, suggestedUnitId: '', suffix: '' });
+      else setCart(previous => previous.map(item => {
+        if (item.productId !== productId) return item;
+        const unitIds = (item.unitIds || []).slice(0, -1);
+        return { ...item, unitIds, quantity: unitIds.length };
+      }).filter(item => item.quantity > 0));
+      return;
+    }
     setCart(prev => prev
       .map(i => i.productId === productId ? { ...i, quantity: i.quantity + delta, unitIds: (i.unitIds || []).slice(0, Math.max(0, i.quantity + delta)) } : i)
       .filter(i => i.quantity > 0)
     );
-  }, []);
+  }, [productsById]);
 
   const removeFromCart = useCallback((productId) => {
     setCart(prev => prev.filter(i => i.productId !== productId));
@@ -282,9 +327,14 @@ export function usePos({ setActiveTab }) {
     filteredProducts,
     productPage,
     addToCart,
+    selectingProduct,
+    unitSelection,
+    setUnitSelection,
+    addTrackedUnit,
     cart,
     isMobile,
     cartItems,
+    cartUnitLabels,
     updateQty,
     removeFromCart,
     cartTotal,

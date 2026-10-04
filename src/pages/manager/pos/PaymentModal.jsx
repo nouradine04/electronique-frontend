@@ -8,7 +8,6 @@ export function PaymentModal({
   setShowPaymentModal,
   cartTotal,
   cartItems,
-  setCart,
   paymentMethods,
   paymentMethod,
   setPaymentMethod,
@@ -41,7 +40,7 @@ export function PaymentModal({
             </div>
 
             {cartItems.filter(item => item.product.trackingMode !== 'QUANTITY').map(item => <div key={item.productId}><strong>{item.product.name}</strong>
-                  {item.product.trackingMode !== 'QUANTITY' && <UnitPicker productId={item.productId} quantity={item.quantity} selected={item.unitIds || []} onChange={ids => setCart(prev => prev.map(row => row.productId === item.productId ? { ...row, unitIds: ids } : row))} />}
+                  {item.product.trackingMode !== 'QUANTITY' && <UnitPicker productId={item.productId} shopId={item.product.shopId} quantity={item.quantity} selected={item.unitIds || []} lockedSelected onChange={() => {}} />}
             </div>)}
 
             {/* Payment method */}

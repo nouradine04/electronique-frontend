@@ -3,6 +3,8 @@ import { LocalImage } from '../../../components/common/LocalImage.jsx';
 import './product-card.css';
 
 export function ProductCard({ product, onOpen, onEdit, onDelete, view = 'grid' }) {
+  const [productTitle, ...variantParts] = String(product.name || '').split(' · ');
+  const variant = variantParts.join(' · ');
   const quantity = Number(product.quantity || 0);
   const minimum = Number(product.minStock ?? 5);
   const pending = product.status === 'PENDING_PRICE';
@@ -37,7 +39,8 @@ export function ProductCard({ product, onOpen, onEdit, onDelete, view = 'grid' }
         />
       </span>
       <span className="product-tile-body">
-        <strong className="product-tile-name">{product.name}</strong>
+        <strong className="product-tile-name">{productTitle}</strong>
+        {variant && <span className="product-tile-variant">{variant}</span>}
         <span className="product-tile-bottom">
           <strong className="product-tile-price">{pending ? 'Prix à définir' : `${Number(product.price || 0).toLocaleString('fr-FR')} FCFA`}</strong>
           <span className="product-tile-quantity">{quantity} unité{quantity > 1 ? 's' : ''}</span>

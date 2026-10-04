@@ -12,7 +12,7 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "test:products": "node --test tests/product-wizard.test.mjs tests/product-units.test.mjs tests/media-upload.test.mjs",
+    "test:products": "node --test tests/product-wizard.test.mjs tests/product-units.test.mjs tests/media-upload.test.mjs tests/pos-search.test.mjs",
     "test:auth": "node --test tests/cloud-auth.test.mjs tests/registration-flow.test.mjs tests/login-flow.test.mjs tests/session.test.mjs"
   },
   "dependencies": {

@@ -98,7 +98,7 @@ export function ReturnSaleModal({ sale, product, client, alreadyReturned = 0, on
             <input style={fieldStyle} type="number" min="1" max={remaining} step="1" value={quantity} onChange={event => setQuantity(event.target.value)} required />
           </label>
 
-          {product.trackingMode !== 'QUANTITY' && <UnitPicker productId={product.id} saleId={sale.id} quantity={Number(quantity)} selected={unitIds} onChange={setUnitIds} />}
+          {product.trackingMode !== 'QUANTITY' && <UnitPicker productId={product.id} shopId={product.shopId} saleId={sale.id} quantity={Number(quantity)} selected={unitIds} onChange={setUnitIds} />}
 
           <label style={{ display: 'grid', gap: '7px', fontSize: '13px', fontWeight: 700 }}>
             Motif du retour

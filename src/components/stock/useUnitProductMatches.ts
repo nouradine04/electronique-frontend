@@ -7,3 +7,11 @@ export function useUnitProductMatches(shopId: string, search: string, state?: st
   const units = useQuery(shopId && value.length >= 3 ? database.get('product_units').query(Q.where('shop_id', shopId), ...(state ? [Q.where('state', state)] : []), Q.where('identifier', Q.like(`${Q.sanitizeLikeString(value)}%`)), Q.take(100)) : null);
   return new Set(units.map(unit => unitRaw(unit).product_id));
 }
+
+export function useExactUnitMatch(shopId: string, search: string) {
+  const value = normalizeIdentifierSearch(search);
+  const units = useQuery(shopId && value.length >= 3 ? database.get('product_units').query(
+    Q.where('shop_id', shopId), Q.where('identifier', value), Q.take(2),
+  ) : null);
+  return units.length === 1 ? unitRaw(units[0]) : null;
+}
