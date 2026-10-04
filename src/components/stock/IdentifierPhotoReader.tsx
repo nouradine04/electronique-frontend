@@ -3,8 +3,12 @@ import { Camera, ImagePlus, LoaderCircle, Check } from 'lucide-react';
 import { CameraCapture } from './CameraCapture';
 import { readIdentifierPhoto } from '../../services/identifierOcr';
 import { parseIdentifiers, type TrackingMode } from '../../services/productUnits';
+import { useShop } from '../../context/ShopContext.jsx';
 
 export function IdentifierPhotoReader({ mode, value, onChange }: { mode: TrackingMode; value: string; onChange: (text: string) => void }) {
+  const { currentShop } = useShop();
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const [camera, setCamera] = useState(false), [busy, setBusy] = useState(false), [progress, setProgress] = useState(0);
   const [error, setError] = useState(''), [choices, setChoices] = useState<string[]>([]), [selected, setSelected] = useState(''), [preview, setPreview] = useState(''), [detected, setDetected] = useState('');
   const input = useRef<HTMLInputElement>(null), nativeCamera = useRef<HTMLInputElement>(null), job = useRef<AbortController | null>(null), previewUrl = useRef('');
@@ -17,7 +21,7 @@ export function IdentifierPhotoReader({ mode, value, onChange }: { mode: Trackin
     if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
     previewUrl.current = URL.createObjectURL(file); setPreview(previewUrl.current);
     try {
-      const values = await readIdentifierPhoto(file, mode, setProgress, controller.signal);
+      const values = await readIdentifierPhoto(file, mode, setProgress, controller.signal, currentShop?.id);
       if (controller.signal.aborted) return;
       if (values.length === 1) {
         const identifier = values[0];
@@ -32,7 +36,7 @@ export function IdentifierPhotoReader({ mode, value, onChange }: { mode: Trackin
     } catch (err) {
       if (!controller.signal.aborted) {
         console.warn('[IMEI] Lecture photo impossible :', err instanceof Error ? err.message : 'erreur inconnue');
-        setError(err instanceof Error && /photo|lecteur IMEI|format|illisible|identifiant|IMEI invalide|même identifiant|chiffre de contrôle/i.test(err.message)
+        setError(err instanceof Error && /photo|lecteur IMEI|lecture serveur|format|illisible|identifiant|IMEI invalide|même identifiant|chiffre de contrôle/i.test(err.message)
           ? err.message
           : navigator.onLine ? 'La lecture IMEI a échoué. Réessayez ou saisissez le numéro indiqué sur l’appareil.' : 'Lecture hors ligne indisponible sur cet appareil. Réessayez avec une connexion.');
       }
@@ -49,12 +53,16 @@ export function IdentifierPhotoReader({ mode, value, onChange }: { mode: Trackin
   return <div style={{ display: 'grid', gap: 10, margin: '12px 0' }}>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => {
-        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) nativeCamera.current?.click();
+        // iOS may expose getUserMedia but refuse to start it inside an installed
+        // PWA or browser container. The native camera picker is more reliable.
+        if (isIos || !window.isSecureContext || !navigator.mediaDevices?.getUserMedia) nativeCamera.current?.click();
         else setCamera(true);
       }}><Camera size={17} />Scanner</button>
       <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => input.current?.click()}><ImagePlus size={17} />Photo</button>
     </div>
-    <small style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>Alignez l’IMEI ou S/N dans la fente. Si la caméra intégrée ne s’ouvre pas, prenez une photo avec l’appareil. La première lecture OCR nécessite Internet.</small>
+    <small style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>{isIos
+      ? 'Photographiez nettement la ligne IMEI ou S/N. La lecture automatique sur iPhone nécessite Internet.'
+      : 'Alignez l’IMEI ou S/N dans la fente. Si la caméra intégrée ne s’ouvre pas, prenez une photo avec l’appareil.'}</small>
     <input ref={input} type="file" accept="image/*" hidden onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void read(file); }} />
     <input ref={nativeCamera} type="file" accept="image/*" capture="environment" hidden onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void read(file); }} />
     {camera && <CameraCapture mode="identifier" onCapture={read} onClose={closeCamera} />}

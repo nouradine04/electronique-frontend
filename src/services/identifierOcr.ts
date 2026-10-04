@@ -1,4 +1,6 @@
 import { parseIdentifiers, type TrackingMode } from './productUnits';
+import { apiUrl, getAuthHeaders } from './apiClient';
+import { ensureAccessToken, invalidateAccessToken } from './session';
 
 export function identifiersFromText(text: string, mode: TrackingMode): string[] {
   const candidates = mode === 'IMEI'
@@ -16,7 +18,7 @@ async function imageCanvas(file: File) {
       image.onerror = () => reject(new Error('Cette photo ne peut pas être ouverte. Essayez une capture JPG ou PNG.'));
       image.src = url;
     });
-    const scale = Math.min(1, 2200 / Math.max(image.naturalWidth, image.naturalHeight));
+    const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement('canvas'); canvas.width = Math.round(image.naturalWidth * scale); canvas.height = Math.round(image.naturalHeight * scale);
     const ctx = canvas.getContext('2d'); if (!ctx || !canvas.width) throw new Error('Photo illisible.');
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
@@ -47,16 +49,36 @@ async function readBarcode(canvas: HTMLCanvasElement, mode: TrackingMode): Promi
   }
 }
 
-export async function readIdentifierPhoto(file: File, mode: TrackingMode, progress: (value: number) => void, signal: AbortSignal) {
+async function readFromServer(canvas: HTMLCanvasElement, mode: TrackingMode, shopId: string, signal: AbortSignal): Promise<string[]> {
+  if (!shopId || mode === 'QUANTITY') throw new Error('Boutique ou suivi du produit indisponible.');
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Photo illisible.')), 'image/jpeg', .82));
+  await ensureAccessToken();
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  if (signal.aborted) abort();
+  const timer = setTimeout(abort, 28_000);
+  const send = () => fetch(apiUrl(`/media/ocr/${encodeURIComponent(shopId)}?mode=${mode}`), {
+    method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'image/jpeg' }), body: blob, signal: controller.signal,
+  });
+  try {
+    let response = await send();
+    if (response.status === 401) { invalidateAccessToken(); await ensureAccessToken(); response = await send(); }
+    if (!response.ok) throw new Error(`Lecture serveur indisponible (${response.status}).`);
+    const body = await response.json();
+    return Array.isArray(body.identifiers) ? [...new Set(body.identifiers.filter((id: unknown) => {
+      if (typeof id !== 'string') return false;
+      try { return parseIdentifiers(id, mode).length === 1; } catch { return false; }
+    }))] as string[] : [];
+  } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
+}
+
+async function readLocalOcr(canvas: HTMLCanvasElement, mode: TrackingMode, progress: (value: number) => void, signal: AbortSignal) {
   if (signal.aborted) throw new Error('Lecture annulée.');
-  const canvas = await imageCanvas(file);
-  if (signal.aborted) throw new Error('Lecture annulée.');
-  const barcodes = await readBarcode(canvas, mode);
-  if (barcodes.length) { canvas.width = 0; canvas.height = 0; return barcodes; }
   let createWorker: typeof import('tesseract.js').createWorker;
   let PSM: typeof import('tesseract.js').PSM;
   try { ({ createWorker, PSM } = await import('tesseract.js')); }
-  catch (error) { canvas.width = 0; canvas.height = 0; throw new Error('Le lecteur IMEI ne peut pas être chargé. Vérifiez la connexion et réessayez.', { cause: error }); }
+  catch (error) { throw new Error('Le lecteur IMEI ne peut pas être chargé. Vérifiez la connexion et réessayez.', { cause: error }); }
   let worker: Awaited<ReturnType<typeof createWorker>> | undefined;
   let expired = false;
   let rejectStop: (reason: Error) => void = () => {};
@@ -94,5 +116,32 @@ export async function readIdentifierPhoto(file: File, mode: TrackingMode, progre
       return identifiersFromText(result.data.text, mode);
     })();
     return await Promise.race([work, stopped]);
-  } finally { clearTimeout(timeout); signal.removeEventListener('abort', stop); await worker?.terminate(); canvas.width = 0; canvas.height = 0; }
+  } finally { clearTimeout(timeout); signal.removeEventListener('abort', stop); await worker?.terminate(); }
+}
+
+export async function readIdentifierPhoto(file: File, mode: TrackingMode, progress: (value: number) => void, signal: AbortSignal, shopId = '') {
+  if (signal.aborted) throw new Error('Lecture annulée.');
+  const canvas = await imageCanvas(file);
+  try {
+    if (signal.aborted) throw new Error('Lecture annulée.');
+    const barcodes = await readBarcode(canvas, mode);
+    if (barcodes.length) return barcodes;
+    // WebKit on iPhone can reject its WASM OCR worker even while camera/photo
+    // capture works. Prefer the authenticated server for this browser online.
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const preferServer = isIos && navigator.onLine !== false && Boolean(shopId);
+    let serverError: unknown;
+    if (preferServer) {
+      try { return await readFromServer(canvas, mode, shopId, signal); }
+      catch (error) { if (signal.aborted) throw error; serverError = error; console.warn('[IMEI] Lecture serveur indisponible, essai local :', error); }
+    }
+    try { return await readLocalOcr(canvas, mode, progress, signal); }
+    catch (error) {
+      if (signal.aborted || navigator.onLine === false || !shopId) throw error;
+      if (preferServer) throw serverError instanceof Error ? serverError : error;
+      console.warn('[IMEI] Lecture locale indisponible, essai serveur :', error);
+      return readFromServer(canvas, mode, shopId, signal);
+    }
+  } finally { canvas.width = 0; canvas.height = 0; }
 }
