@@ -1,42 +1,40 @@
 import { AutomaticAppUpdates } from './components/AutomaticAppUpdates';
 import React, { useState } from 'react';
 import { isInstalledApp } from './services/appMode';
-import { useQueryState } from './db/useQuery.js';
 import { LoadingScreen } from './components/ui/LoadingScreen';
-import { queryProducts, querySales } from './db/queries.js';
 import { ShopProvider, useShop } from './context/ShopContext.jsx';
 import { SyncProvider } from './context/SyncContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import './i18n.js';
-import { LoginPage } from './pages/common/LoginPage.jsx';
-import { LandingPage } from './pages/common/LandingPage.jsx';
 import { Sidebar } from './components/layout/Sidebar.jsx';
 import { Header } from './components/layout/Header.jsx';
 import { BottomNav } from './components/layout/BottomNav.jsx';
-import { ManagerStockPage } from './pages/manager/StockPage.jsx';
-import { AdminStockPage } from './pages/admin/StockPage.jsx';
-import { OwnerDashboardView } from './pages/admin/DashboardPage.jsx';
-import { InvoicesPage } from './pages/common/InvoicesPage.jsx';
-import { ManagerDashboardPage } from './pages/manager/ManagerDashboardPage.jsx';
-import { ManagerClientsPage } from './pages/manager/ManagerClientsPage.jsx';
-import { PosPage } from './pages/manager/PosPage.jsx';
-import { CreditsPage } from './pages/common/CreditsPage.jsx';
-import { CatalogManagementPage } from './pages/manager/CatalogPage.jsx';
-import { SettingsPage } from './pages/common/SettingsPage.jsx';
-import { ProfitPage } from './pages/admin/ProfitPage.jsx';
-import { TransactionsPage } from './pages/admin/TransactionsPage.jsx';
-import { CrmPage } from './pages/admin/CrmPage.jsx';
-import { TeamPage } from './pages/admin/TeamPage.jsx';
 import { ensurePersistentStorage } from './services/persistentStorage.js';
 import { closeDesktopVault, isTauriDesktop } from './services/desktopVault';
 import { stopDesktopBackup } from './services/desktopBackup';
 import { SessionNotice } from './components/auth/SessionNotice';
 import { getSession } from './services/session';
 
+const lazyPage = (load, name) => React.lazy(() => load().then(module => ({ default: module[name] })));
+const LoginPage = lazyPage(() => import('./pages/common/LoginPage.jsx'), 'LoginPage');
+const LandingPage = lazyPage(() => import('./pages/common/LandingPage.jsx'), 'LandingPage');
+const ManagerStockPage = lazyPage(() => import('./pages/manager/StockPage.jsx'), 'ManagerStockPage');
+const AdminStockPage = lazyPage(() => import('./pages/admin/StockPage.jsx'), 'AdminStockPage');
+const OwnerDashboardView = lazyPage(() => import('./pages/admin/DashboardPage.jsx'), 'OwnerDashboardView');
+const InvoicesPage = lazyPage(() => import('./pages/common/InvoicesPage.jsx'), 'InvoicesPage');
+const ManagerDashboardPage = lazyPage(() => import('./pages/manager/ManagerDashboardPage.jsx'), 'ManagerDashboardPage');
+const ManagerClientsPage = lazyPage(() => import('./pages/manager/ManagerClientsPage.jsx'), 'ManagerClientsPage');
+const PosPage = lazyPage(() => import('./pages/manager/PosPage.jsx'), 'PosPage');
+const CreditsPage = lazyPage(() => import('./pages/common/CreditsPage.jsx'), 'CreditsPage');
+const CatalogManagementPage = lazyPage(() => import('./pages/manager/CatalogPage.jsx'), 'CatalogManagementPage');
+const SettingsPage = lazyPage(() => import('./pages/common/SettingsPage.jsx'), 'SettingsPage');
+const ProfitPage = lazyPage(() => import('./pages/admin/ProfitPage.jsx'), 'ProfitPage');
+const TransactionsPage = lazyPage(() => import('./pages/admin/TransactionsPage.jsx'), 'TransactionsPage');
+const CrmPage = lazyPage(() => import('./pages/admin/CrmPage.jsx'), 'CrmPage');
+const TeamPage = lazyPage(() => import('./pages/admin/TeamPage.jsx'), 'TeamPage');
+
 function MainAppContent() {
   const { currentShop, userRole, isInitialized, hasValidLocalSession, logout } = useShop();
-  const { records: products, loading: productsLoading } = useQueryState(queryProducts(currentShop?.id || ''));
-  const { records: sales, loading: salesLoading } = useQueryState(querySales(currentShop?.id || ''));
   // Le coffre SQLCipher exige une ouverture explicite après chaque redémarrage
   // de l'application desktop. La version web conserve son comportement actuel.
   const [isAuthenticated, setIsAuthenticated] = useState(() => !isTauriDesktop() && Boolean(getSession()?.userId));
@@ -50,6 +48,10 @@ function MainAppContent() {
       setActiveTab('dashboard');
     }
   }, [isAuthenticated, userRole]);
+
+  React.useEffect(() => {
+    if (isAuthenticated && currentShop) window.dispatchEvent(new Event('nstock:view-activated'));
+  }, [activeTab, currentShop?.id, isAuthenticated]);
 
   // Une préférence de session sans boutique locale ne constitue pas une
   // authentification valide. Ce cas peut arriver après un nettoyage navigateur.
@@ -88,7 +90,7 @@ function MainAppContent() {
     setIsAuthenticated(false);
   };
 
-  if (!isInitialized || (isAuthenticated && (!hasValidLocalSession || !currentShop || productsLoading || salesLoading))) {
+  if (!isInitialized || (isAuthenticated && (!hasValidLocalSession || !currentShop))) {
     return (
       <LoadingScreen />
     );
@@ -97,15 +99,15 @@ function MainAppContent() {
   // Render Landing or Login Page if not signed in
   if (!isAuthenticated) {
     if (currentPage === 'login') {
-      return <LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={(page) => setCurrentPage(isInstalledApp() && page === 'landing' ? 'login' : page)} />;
+      return <React.Suspense fallback={<LoadingScreen />}><LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={(page) => setCurrentPage(isInstalledApp() && page === 'landing' ? 'login' : page)} /></React.Suspense>;
     }
     return (
-      <LandingPage 
+      <React.Suspense fallback={<LoadingScreen />}><LandingPage 
         onLoginSuccess={handleLoginSuccess} 
         onNavigate={setCurrentPage} 
         initialView={currentPage === 'register' ? 'register' : 'landing'} 
         appOnly={isInstalledApp()}
-      />
+      /></React.Suspense>
     );
   }
 
@@ -163,6 +165,7 @@ function MainAppContent() {
 
         {/* Dynamic Page Views */}
         <main style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+          <React.Suspense fallback={<div role="status">Chargement de l’écran…</div>}>
           
           {activeTab === 'add' && (
             <CatalogManagementPage />
@@ -178,7 +181,7 @@ function MainAppContent() {
 
           {activeTab === 'dashboard' && (
             userRole === 'owner' ? (
-              <OwnerDashboardView shop={currentShop} products={products} sales={sales} onNavigate={setActiveTab} />
+              <OwnerDashboardView shop={currentShop} onNavigate={setActiveTab} />
             ) : (
               <ManagerDashboardPage setActiveTab={setActiveTab} />
             )
@@ -219,6 +222,7 @@ function MainAppContent() {
           {activeTab === 'settings' && (
             <SettingsPage key={currentShop.id} />
           )}
+          </React.Suspense>
         </main>
       </div>
       

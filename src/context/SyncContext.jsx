@@ -23,6 +23,7 @@ const SyncContext = createContext();
 
 const RETRY_INTERVAL = 15000; // 15s entre les tentatives
 const SYNC_ON_FOCUS = true;   // Re-sync quand l'onglet devient actif
+const ACTIVATION_PULL_GAP = 20 * 1000;
 const SYNC_BATCH_SIZE = 500;
 const MAX_PUSH_BATCHES_PER_RUN = 10;
 const HELD_RETRY_INTERVAL = 10 * 60 * 1000;
@@ -71,6 +72,7 @@ export function SyncProvider({ children }) {
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const retryTimer = useRef(null);
   const syncLock = useRef(false);
+  const lastActivationPull = useRef(0);
   const syncSchedule = useRef({ key: '', lastSuccess: 0, retryAt: 0, failures: 0 });
 
   // Mise à jour du compteur de pending en temps réel
@@ -415,16 +417,31 @@ export function SyncProvider({ children }) {
   // l'événement `online` prennent ensuite le relais sans demander à l'utilisateur.
   useEffect(() => {
     if (LOCAL_ONLY || !isOnline || !currentShop) return;
+    lastActivationPull.current = Date.now();
     const timer = setTimeout(() => syncWithBackend(true), reconnectDelay());
     return () => clearTimeout(timer);
   }, [currentShop, isOnline, syncWithBackend]);
 
-  // Re-sync au focus de l'onglet
+  // Une autre machine peut avoir modifié la boutique depuis le dernier pull.
+  // Le retour sur l'application force une lecture, sans attendre le délai de
+  // rafraîchissement normal. Limiter les événements focus/visibility doublons.
   useEffect(() => {
     if (LOCAL_ONLY || !SYNC_ON_FOCUS) return;
-    const handleFocus = () => { if (isOnline) syncWithBackend(); };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    const handleActivation = () => {
+      if (!isOnline || document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastActivationPull.current < ACTIVATION_PULL_GAP) return;
+      lastActivationPull.current = now;
+      void syncWithBackend(true);
+    };
+    window.addEventListener('focus', handleActivation);
+    window.addEventListener('nstock:view-activated', handleActivation);
+    document.addEventListener('visibilitychange', handleActivation);
+    return () => {
+      window.removeEventListener('focus', handleActivation);
+      window.removeEventListener('nstock:view-activated', handleActivation);
+      document.removeEventListener('visibilitychange', handleActivation);
+    };
   }, [isOnline, syncWithBackend]);
 
   // Compteur initial

@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Banknote, ShoppingBag, CreditCard, Plus, ArrowRight, Package, Check, Bell, TrendingUp } from 'lucide-react';
 import { RevenueChart } from './RevenueChart.jsx';
-import { useQuery } from '../../db/useQuery.js';
-import { queryPayments, queryReturns } from '../../db/queries.js';
+import { useQuery, useQueryState } from '../../db/useQuery.js';
+import { queryPayments, queryProducts, queryReturns, querySales } from '../../db/queries.js';
 import './dashboard.css';
 
 const money = value => `${Number(value || 0).toLocaleString('fr-FR')} FCFA`;
 const value = (record, camel, snake) => record[camel] ?? record[snake];
 
-export function OwnerDashboardView({ shop, products = [], sales = [], onNavigate }) {
+export function OwnerDashboardView({ shop, onNavigate }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { records: products, loading: productsLoading } = useQueryState(shop ? queryProducts(shop.id) : null);
+  const { records: sales, loading: salesLoading } = useQueryState(shop ? querySales(shop.id) : null);
   const payments = useQuery(shop ? queryPayments(shop.id) : null, [shop?.id]) || [];
   const returns = useQuery(shop ? queryReturns(shop.id) : null, [shop?.id]) || [];
   const now = new Date();
@@ -37,6 +39,7 @@ export function OwnerDashboardView({ shop, products = [], sales = [], onNavigate
   const low = active.filter(p => p.quantity > 0 && p.quantity <= Number(value(p, 'minStock', 'min_stock') ?? 5)).length;
   const recent = [...sales].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
   const tasks = [pending && `${pending} produit(s) à valider`, empty && `${empty} produit(s) épuisé(s)`, low && `${low} produit(s) bientôt épuisé(s)`].filter(Boolean);
+  if (productsLoading || salesLoading) return <div className="owner-home" role="status">Chargement du tableau de bord…</div>;
   return <div className="owner-home">
     <header className="owner-heading"><div><h2>{shop?.name || 'Ma boutique'}</h2><p>Aujourd’hui · {now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</p></div><button className="owner-notification" aria-label={`Notifications : ${pending + empty + low} produits à traiter`} aria-expanded={notificationsOpen} aria-controls="owner-notifications" onClick={() => setNotificationsOpen(open => !open)}><Bell size={23} /><span>Notifications</span>{pending + empty + low > 0 && <b>{pending + empty + low}</b>}</button></header>
     {notificationsOpen && <section id="owner-notifications" className="owner-panel"><h3>Notifications de la boutique</h3>{tasks.map(task => <button key={task} className="owner-row" onClick={() => onNavigate('inventory')}><Package size={22} /><span>{task}</span><ArrowRight size={18} /></button>)}{!tasks.length && <p className="owner-empty"><Check size={20} /> Aucune alerte pour le moment.</p>}</section>}

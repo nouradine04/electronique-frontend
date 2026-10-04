@@ -23,11 +23,40 @@ async function imageCanvas(file: File) {
     return canvas;
   } finally { URL.revokeObjectURL(url); }
 }
+
+async function readBarcode(canvas: HTMLCanvasElement, mode: TrackingMode): Promise<string[]> {
+  const Detector = (globalThis as typeof globalThis & { BarcodeDetector?: {
+    new (options: { formats: string[] }): { detect: (source: HTMLCanvasElement) => Promise<Array<{ rawValue: string }>> };
+    getSupportedFormats?: () => Promise<string[]>;
+  } }).BarcodeDetector;
+  if (!Detector) return [];
+  try {
+    const wanted = ['code_128', 'code_39', 'itf', 'qr_code', 'data_matrix'];
+    const supported = await Detector.getSupportedFormats?.();
+    const formats = supported ? wanted.filter(format => supported.includes(format)) : wanted;
+    if (!formats.length) return [];
+    const detector = new Detector({ formats });
+    const codes = await detector.detect(canvas);
+    const values = codes.flatMap(code => mode === 'IMEI'
+      ? identifiersFromText(code.rawValue, mode)
+      : [code.rawValue.trim().toUpperCase()].filter(value => { try { return parseIdentifiers(value, mode).length === 1; } catch { return false; } }));
+    return [...new Set(values)];
+  } catch {
+    // BarcodeDetector may exist but reject a format on this browser. OCR remains available.
+    return [];
+  }
+}
+
 export async function readIdentifierPhoto(file: File, mode: TrackingMode, progress: (value: number) => void, signal: AbortSignal) {
-  const { createWorker, PSM } = await import('tesseract.js');
   if (signal.aborted) throw new Error('Lecture annulée.');
   const canvas = await imageCanvas(file);
   if (signal.aborted) throw new Error('Lecture annulée.');
+  const barcodes = await readBarcode(canvas, mode);
+  if (barcodes.length) { canvas.width = 0; canvas.height = 0; return barcodes; }
+  let createWorker: typeof import('tesseract.js').createWorker;
+  let PSM: typeof import('tesseract.js').PSM;
+  try { ({ createWorker, PSM } = await import('tesseract.js')); }
+  catch (error) { canvas.width = 0; canvas.height = 0; throw new Error('Le lecteur IMEI ne peut pas être chargé. Vérifiez la connexion et réessayez.', { cause: error }); }
   let worker: Awaited<ReturnType<typeof createWorker>> | undefined;
   let expired = false;
   let rejectStop: (reason: Error) => void = () => {};
@@ -37,13 +66,30 @@ export async function readIdentifierPhoto(file: File, mode: TrackingMode, progre
   signal.addEventListener('abort', stop, { once: true });
   try {
     const work = (async () => {
-      try { worker = await createWorker('eng', 1, {
-        workerPath: '/ocr/v6/worker.min.js', corePath: '/ocr/v6', langPath: '/ocr/v6', workerBlobURL: false,
+      const assetRoot = `${location.origin}${import.meta.env.BASE_URL}ocr/v6`.replace(/\/$/, '');
+      const options = {
+        workerPath: `${assetRoot}/worker.min.js`, langPath: assetRoot, workerBlobURL: false,
         // Files are cached by the service worker; avoid a second language-file copy.
-        cacheMethod: 'none', logger: event => progress(event.status === 'recognizing text' ? Math.round(event.progress * 100) : 0),
-      }); } catch (error) { throw new Error('Le module de lecture IMEI n’a pas pu démarrer sur cet appareil.', { cause: error }); }
+        cacheMethod: 'none' as const,
+        logger: (event: { status: string; progress: number }) => progress(event.status === 'recognizing text' ? Math.round(event.progress * 100) : 0),
+      };
+      try { worker = await createWorker('eng', 1, { ...options, corePath: assetRoot }); }
+      catch (firstError) {
+        // Some WebKit devices report SIMD support but fail to initialize that core.
+        console.warn('[IMEI] Moteur optimisé indisponible, essai du moteur standard :', firstError);
+        try { worker = await createWorker('eng', 1, { ...options, corePath: `${assetRoot}/tesseract-core-lstm.wasm.js` }); }
+        catch (error) {
+          console.warn('[IMEI] Initialisation OCR :', error);
+          throw new Error(navigator.onLine === false
+            ? 'Le lecteur IMEI n’est pas encore disponible hors ligne. Connectez-vous une fois puis réessayez.'
+            : 'Le lecteur IMEI n’a pas pu démarrer. Réessayez avec une photo nette ou saisissez le numéro.', { cause: error });
+        }
+      }
       if (expired || signal.aborted) { await worker.terminate(); throw new Error('Lecture annulée.'); }
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+      await worker.setParameters({
+        tessedit_pageseg_mode: canvas.width > canvas.height * 2 ? PSM.SINGLE_LINE : PSM.SPARSE_TEXT,
+        ...(mode === 'IMEI' ? { tessedit_char_whitelist: '0123456789 -' } : {}),
+      });
       const result = await worker.recognize(canvas);
       return identifiersFromText(result.data.text, mode);
     })();
