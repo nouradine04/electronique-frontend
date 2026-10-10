@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test:sync": "node --test tests/sync.test.mjs tests/push.test.mjs tests/session.test.mjs",
+    "test:sync": "node --test tests/sync.test.mjs tests/push.test.mjs tests/session.test.mjs tests/sale-history.test.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:tauri-web": "node scripts/build-tauri-web.mjs",

@@ -3,17 +3,26 @@ import { Banknote, ShoppingBag, CreditCard, Plus, ArrowRight, Package, Check, Be
 import { RevenueChart } from './RevenueChart.jsx';
 import { useQuery, useQueryState } from '../../db/useQuery.js';
 import { queryPayments, queryProducts, queryReturns, querySales } from '../../db/queries.js';
+import { useSaleHistory } from '../../services/useSaleHistory.js';
+import { useSync } from '../../context/SyncContext.jsx';
+import { useHybridRead } from '../../services/useHybridRead.js';
 import './dashboard.css';
 
 const money = value => `${Number(value || 0).toLocaleString('fr-FR')} FCFA`;
 const value = (record, camel, snake) => record[camel] ?? record[snake];
 
 export function OwnerDashboardView({ shop, onNavigate }) {
+  const { initialPullPending } = useSync();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const { records: products, loading: productsLoading } = useQueryState(shop ? queryProducts(shop.id) : null);
-  const { records: sales, loading: salesLoading } = useQueryState(shop ? querySales(shop.id) : null);
-  const payments = useQuery(shop ? queryPayments(shop.id) : null, [shop?.id]) || [];
-  const returns = useQuery(shop ? queryReturns(shop.id) : null, [shop?.id]) || [];
+  const localProducts = useQueryState(shop ? queryProducts(shop.id) : null);
+  const localSales = useQueryState(shop ? querySales(shop.id) : null);
+  const { records: products, loading: productsLoading } = useHybridRead('products', shop?.id, localProducts.records);
+  const { records: sales, loading: salesLoading } = useHybridRead('sales', shop?.id, localSales.records);
+  const { sales: visibleSales, loading: historyLoading } = useSaleHistory(shop?.id, sales, 5);
+  const localPayments = useQuery(shop ? queryPayments(shop.id) : null, [shop?.id]) || [];
+  const localReturns = useQuery(shop ? queryReturns(shop.id) : null, [shop?.id]) || [];
+  const payments = useHybridRead('payments', shop?.id, localPayments).records;
+  const returns = useHybridRead('returns', shop?.id, localReturns).records;
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
@@ -37,9 +46,9 @@ export function OwnerDashboardView({ shop, onNavigate }) {
   const active = products.filter(p => String(p.status).toUpperCase() === 'ACTIVE');
   const empty = active.filter(p => p.quantity <= 0).length;
   const low = active.filter(p => p.quantity > 0 && p.quantity <= Number(value(p, 'minStock', 'min_stock') ?? 5)).length;
-  const recent = [...sales].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+  const recent = visibleSales.slice(0, 5);
   const tasks = [pending && `${pending} produit(s) à valider`, empty && `${empty} produit(s) épuisé(s)`, low && `${low} produit(s) bientôt épuisé(s)`].filter(Boolean);
-  if (productsLoading || salesLoading) return <div className="owner-home" role="status">Chargement du tableau de bord…</div>;
+  if (productsLoading || salesLoading || (initialPullPending && !products.length && !sales.length)) return <div className="owner-home" role="status">Chargement du tableau de bord…</div>;
   return <div className="owner-home">
     <header className="owner-heading"><div><h2>{shop?.name || 'Ma boutique'}</h2><p>Aujourd’hui · {now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</p></div><button className="owner-notification" aria-label={`Notifications : ${pending + empty + low} produits à traiter`} aria-expanded={notificationsOpen} aria-controls="owner-notifications" onClick={() => setNotificationsOpen(open => !open)}><Bell size={23} /><span>Notifications</span>{pending + empty + low > 0 && <b>{pending + empty + low}</b>}</button></header>
     {notificationsOpen && <section id="owner-notifications" className="owner-panel"><h3>Notifications de la boutique</h3>{tasks.map(task => <button key={task} className="owner-row" onClick={() => onNavigate('inventory')}><Package size={22} /><span>{task}</span><ArrowRight size={18} /></button>)}{!tasks.length && <p className="owner-empty"><Check size={20} /> Aucune alerte pour le moment.</p>}</section>}
@@ -56,8 +65,8 @@ export function OwnerDashboardView({ shop, onNavigate }) {
     <RevenueChart sales={sales} payments={payments} returns={returns} />
     <button className="owner-profit owner-panel" onClick={() => onNavigate('profit')}><TrendingUp size={26} /><span><strong>Rentabilité de ma boutique</strong><small>Voir les bénéfices, les coûts d’achat et les dépenses</small></span><ArrowRight size={20} /></button>
     <section className="owner-panel owner-recent"><div className="owner-section-heading"><h3>Dernières ventes</h3><button onClick={() => onNavigate('transactions')}>Voir tout <ArrowRight size={16} /></button></div>
-      {!recent.length && <p className="owner-empty">Aucune vente pour le moment. Utilisez « Vendre » pour commencer.</p>}
-      {recent.map(sale => <div className="owner-sale" key={sale.id}><div><strong>{products.find(p => p.id === value(sale, 'productId', 'product_id'))?.name || 'Produit indisponible'}</strong><p>Vendu par <strong>{value(sale, 'sellerName', 'seller_name') || 'Vendeur non renseigné'}</strong></p><small>{new Date(sale.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><div className="owner-sale-amount"><strong>{money(Number(value(sale, 'totalPrice', 'total_price') || 0) - Number(value(sale, 'refundedAmount', 'refunded_amount') || 0))}</strong><small className={`owner-payment ${isCredit(sale) ? 'credit' : ''}`}>{isCredit(sale) ? 'Crédit' : String(value(sale, 'paymentMethod', 'payment_method')).toLowerCase() === 'cash' ? 'Espèces' : 'Mobile Money'}</small></div></div>)}
+      {!recent.length && <p className="owner-empty">{historyLoading ? 'Chargement des dernières ventes…' : 'Aucune vente pour le moment. Utilisez « Vendre » pour commencer.'}</p>}
+      {recent.map(sale => <div className="owner-sale" key={sale.id}><div><strong>{products.find(p => p.id === value(sale, 'productId', 'product_id'))?.name || sale.productName || 'Produit indisponible'}</strong><p>Vendu par <strong>{value(sale, 'sellerName', 'seller_name') || 'Vendeur non renseigné'}</strong></p><small>{new Date(sale.date).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><div className="owner-sale-amount"><strong>{money(Number(value(sale, 'totalPrice', 'total_price') || 0) - Number(value(sale, 'refundedAmount', 'refunded_amount') || 0))}</strong><small className={`owner-payment ${isCredit(sale) ? 'credit' : ''}`}>{isCredit(sale) ? 'Crédit' : String(value(sale, 'paymentMethod', 'payment_method')).toLowerCase() === 'cash' ? 'Espèces' : 'Mobile Money'}</small></div></div>)}
     </section>
   </div>;
 }

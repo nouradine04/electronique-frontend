@@ -5,6 +5,7 @@ import { queryProducts, querySales, queryClients, queryPayments } from '../../db
 import { useShop } from '../../context/ShopContext.jsx';
 import { FaTimes, FaSearch, FaChevronRight, FaPhoneAlt, FaUser, FaCreditCard, FaCoins } from 'react-icons/fa';
 import { Pagination } from '../../components/ui/Pagination.jsx';
+import { useHybridRead } from '../../services/useHybridRead.js';
 
 const BRAND = '#0e6ba8';
 
@@ -16,10 +17,14 @@ export function CrmPage() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const clients = useQuery(queryClients(currentShop?.id || '')) || [];
-  const sales = useQuery(querySales(currentShop?.id || '')) || [];
-  const payments = useQuery(queryPayments(currentShop?.id || '')) || [];
-  const products = useQuery(queryProducts(currentShop?.id || '')) || [];
+  const localClients = useQuery(queryClients(currentShop?.id || '')) || [];
+  const localSales = useQuery(querySales(currentShop?.id || '')) || [];
+  const localPayments = useQuery(queryPayments(currentShop?.id || '')) || [];
+  const localProducts = useQuery(queryProducts(currentShop?.id || '')) || [];
+  const clients = useHybridRead('clients', currentShop?.id, localClients).records;
+  const sales = useHybridRead('sales', currentShop?.id, localSales).records;
+  const payments = useHybridRead('payments', currentShop?.id, localPayments).records;
+  const products = useHybridRead('products', currentShop?.id, localProducts).records;
 
   const clientStats = useMemo(() => {
     return clients.map(client => {

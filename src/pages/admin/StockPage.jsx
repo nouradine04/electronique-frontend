@@ -1,20 +1,23 @@
 import { useExactUnitMatch, useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '../../db/useQuery.js';
+import { useQuery, useQueryState } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, updateProduct } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
+import { useSync } from '../../context/SyncContext.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { LocalImage } from '../../components/common/LocalImage.jsx';
 import { calculateStockFinance, filterStockProducts } from './stockFinance.js';
 import { normalizeIdentifierSearch } from '../../services/productUnits';
+import { useHybridRead } from '../../services/useHybridRead.js';
 import { Search, ChevronRight, Package, AlertCircle, X, DollarSign, Save, Check, ArrowDown, ArrowUpRight, ArrowDownRight, Minus, Clock3, CircleX } from 'lucide-react';
 import './stock.css';
 
 export function AdminStockPage() {
   const { t } = useTranslation();
   const { currentShop } = useShop();
+  const { initialPullPending, syncError } = useSync();
   const [searchQuery, setSearchQuery] = useState('');
   const unitMatches = useUnitProductMatches(currentShop?.id, searchQuery);
   const exactUnit = useExactUnitMatch(currentShop?.id, searchQuery);
@@ -24,8 +27,10 @@ export function AdminStockPage() {
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const categories = useQuery(queryCategories(currentShop?.id || '')) || [];
-  const products = useQuery(queryProducts(currentShop?.id || '')) || [];
+  const localCategories = useQuery(queryCategories(currentShop?.id || '')) || [];
+  const categories = useHybridRead('categories', currentShop?.id, localCategories).records;
+  const productQuery = useQueryState(currentShop ? queryProducts(currentShop.id) : null);
+  const products = useHybridRead('products', currentShop?.id, productQuery.records).records;
 
   const filteredProducts = filterStockProducts(products, categories, selectedCategory, searchQuery, unitMatches);
   const pendingProducts = filteredProducts.filter(product => product.status === 'PENDING_PRICE');
@@ -127,8 +132,8 @@ export function AdminStockPage() {
         {filteredProducts.length === 0 ? (
           <div className="as-empty">
             <Package size={32} />
-            <strong>{t('admin.no_products_found', 'Aucun produit trouvé.')}</strong>
-            <span>Modifiez la recherche ou choisissez une autre catégorie.</span>
+            <strong>{productQuery.loading || initialPullPending && !products.length ? 'Chargement des produits…' : syncError && !products.length ? 'Synchronisation interrompue.' : t('admin.no_products_found', 'Aucun produit trouvé.')}</strong>
+            <span>{productQuery.loading || initialPullPending && !products.length ? 'Lecture de la boutique en cours.' : syncError && !products.length ? 'Les données locales sont conservées. Réessayez lorsque le serveur répond.' : 'Modifiez la recherche ou choisissez une autre catégorie.'}</span>
           </div>
         ) : (
           <div className="as-inventory" role="table" aria-label="Inventaire des produits">

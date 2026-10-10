@@ -32,6 +32,7 @@ const ProfitPage = lazyPage(() => import('./pages/admin/ProfitPage.jsx'), 'Profi
 const TransactionsPage = lazyPage(() => import('./pages/admin/TransactionsPage.jsx'), 'TransactionsPage');
 const CrmPage = lazyPage(() => import('./pages/admin/CrmPage.jsx'), 'CrmPage');
 const TeamPage = lazyPage(() => import('./pages/admin/TeamPage.jsx'), 'TeamPage');
+const PlatformPage = lazyPage(() => import('./pages/platform/PlatformPage.jsx'), 'PlatformPage');
 
 function MainAppContent() {
   const { currentShop, userRole, isInitialized, hasValidLocalSession, logout } = useShop();
@@ -102,7 +103,7 @@ function MainAppContent() {
       return <React.Suspense fallback={<LoadingScreen />}><LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={(page) => setCurrentPage(isInstalledApp() && page === 'landing' ? 'login' : page)} /></React.Suspense>;
     }
     return (
-      <React.Suspense fallback={<LoadingScreen />}><LandingPage 
+      <React.Suspense fallback={<LoadingScreen />}><LandingPage
         onLoginSuccess={handleLoginSuccess} 
         onNavigate={setCurrentPage} 
         initialView={currentPage === 'register' ? 'register' : 'landing'} 
@@ -241,6 +242,10 @@ export default function App() {
     document.documentElement.classList.toggle('installed-app', installed);
     return () => document.documentElement.classList.remove('installed-app');
   }, []);
+
+  if (window.location.pathname.startsWith('/platform')) {
+    return <React.Suspense fallback={<LoadingScreen />}><PlatformPage /></React.Suspense>;
+  }
 
   return (
       <ToastProvider>

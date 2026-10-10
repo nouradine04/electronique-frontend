@@ -205,6 +205,9 @@ export const decrementProductStock = async (product, qty) => {
 
 export const deleteProduct = async (product) => {
   assertSessionWritable();
+  // A server-backed card is a read model; mutations must always target its
+  // local WatermelonDB record so offline changes and the sync queue stay intact.
+  product = await products.find(product.id);
   if (Number(product.quantity) > 0) throw new Error('Videz le stock avant de supprimer ce produit.');
   const shopId = product.shopId;
   const [linkedSales, linkedUnits, pendingLinks] = await Promise.all([

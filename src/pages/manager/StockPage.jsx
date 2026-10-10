@@ -1,15 +1,17 @@
 import { useExactUnitMatch, useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useState, useEffect, useRef } from 'react';
 import { normalizeIdentifierSearch } from '../../services/productUnits';
-import { useQuery } from '../../db/useQuery.js';
+import { useQuery, useQueryState } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, queryStockMovements, updateProduct } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
+import { useSync } from '../../context/SyncContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { recordStockMovement } from '../../services/syncEngine.js';
 import { StockMovementModal } from '../../components/stock/StockMovementModal.jsx';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
 import { attachProductPhotoAfterSave } from '../../services/productPhotoAfterSave.js';
+import { useHybridRead } from '../../services/useHybridRead.js';
 import {
   Search,
   Plus,
@@ -24,6 +26,7 @@ import { ManagerStockJournal } from '../../components/stock/ManagerStockJournal.
 
 export function ManagerStockPage() {
   const { currentShop, userName } = useShop();
+  const { initialPullPending } = useSync();
   const { showToast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,9 +63,13 @@ export function ManagerStockPage() {
   }, [currentShop?.id, exactUnit?.id, exactUnit?.identifier, exactUnit?.product_id, searchQuery, selectedProductId]);
 
   // Requête WatermelonDB réactive sur le stock de la boutique active
-  const categories = useQuery(queryCategories(currentShop?.id || '')) || [];
-  const products = useQuery(queryProducts(currentShop?.id || '')) || [];
-  const movements = useQuery(queryStockMovements(currentShop?.id || '')) || [];
+  const localCategories = useQuery(queryCategories(currentShop?.id || '')) || [];
+  const categories = useHybridRead('categories', currentShop?.id, localCategories).records;
+  const productQuery = useQueryState(currentShop ? queryProducts(currentShop.id) : null);
+  const productRead = useHybridRead('products', currentShop?.id, productQuery.records);
+  const products = productRead.records;
+  const localMovements = useQuery(queryStockMovements(currentShop?.id || '')) || [];
+  const movements = useHybridRead('stock_movements', currentShop?.id, localMovements, { sinceDays: 30 }).records;
 
   // Filter & Sort Logic
   const filteredProducts = products.filter(product => {
@@ -218,7 +225,7 @@ export function ManagerStockPage() {
         </div>
 
         {activeView === 'inventory'
-          ? <ManagerStockList products={paginatedProducts} onView={setSelectedProductId} onMovement={(product, type) => setMovementModal({ open: true, product, type })} onEdit={product => setProductFormModal({ open: true, product })} />
+          ? productRead.loading || productQuery.loading || initialPullPending && !products.length ? <p role="status" style={{ padding: 24 }}>Chargement des produits…</p> : <ManagerStockList products={paginatedProducts} onView={setSelectedProductId} onMovement={(product, type) => setMovementModal({ open: true, product, type })} onEdit={product => setProductFormModal({ open: true, product })} />
           : <ManagerStockJournal movements={paginatedMovements} productsById={productsById} />}
 
         {/* Pagination Footer */}

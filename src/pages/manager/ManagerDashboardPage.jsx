@@ -10,6 +10,7 @@ import './recent-sales.css';
 
 export function ManagerDashboardPage({ setActiveTab }) {
   const {
+    loading,
     t,
     userName,
     formatDateFrench,
@@ -31,6 +32,8 @@ export function ManagerDashboardPage({ setActiveTab }) {
     showAlertsModal,
     handleDismissAlert,
   } = useManagerDashboard({ setActiveTab });
+
+  if (loading) return <div role="status" style={{ padding: 24 }}>Chargement du tableau de bord…</div>;
 
   return (
     <div style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'inherit' }}>

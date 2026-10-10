@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Search, FileText, Eye, ReceiptText, Wallet, CreditCard } from 'lucide-react';
-import { useQuery } from '../../db/useQuery.js';
+import { useQuery, useQueryState } from '../../db/useQuery.js';
 import { queryProducts, querySales, queryClients } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { InvoicePreview } from '../../components/finance/InvoicePreview.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { useTranslation } from 'react-i18next';
+import { useSaleHistory } from '../../services/useSaleHistory.js';
 import './invoices.css';
 
 const money = value => `${Number(value || 0).toLocaleString('fr-FR')} FCFA`;
@@ -25,7 +26,8 @@ export function InvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const pageSize = 10;
 
-  const sales = useQuery(querySales(currentShop?.id || '')) || [];
+  const localSalesState = useQueryState(currentShop ? querySales(currentShop.id) : null);
+  const { sales, loading: historyLoading, loadingMore, hasMore, error: historyError, loadMore } = useSaleHistory(currentShop?.id, localSalesState.records);
   const products = useQuery(queryProducts(currentShop?.id || '')) || [];
   const clients = useQuery(queryClients(currentShop?.id || '')) || [];
 
@@ -38,9 +40,9 @@ export function InvoicesPage() {
         id: `FAC-${String(sale.id).slice(-6).toUpperCase()}`,
         saleId: sale.id,
         date: sale.date,
-        clientName: client?.name || 'Client comptoir',
-        clientPhone: client?.phone || '',
-        productName: productsById.get(sale.productId)?.name || 'Produit indisponible',
+        clientName: client?.name || sale.clientName || 'Client comptoir',
+        clientPhone: client?.phone || sale.clientPhone || '',
+        productName: productsById.get(sale.productId)?.name || sale.productName || 'Produit indisponible',
         quantity: Number(sale.quantity || 1),
         unitPrice: Number(sale.totalPrice || 0) / Number(sale.quantity || 1),
         totalAmount: Number(sale.totalPrice || 0),
@@ -77,6 +79,8 @@ export function InvoicesPage() {
 
   return <main className="invoices-page">
     <header className="invoices-heading"><div><h1>{t('invoices_page.title', 'Factures')}</h1><p>{t('invoices_page.subtitle', 'Historique des ventes')}</p></div></header>
+    {hasMore && <small>Historique chargé progressivement. Les totaux affichés concernent les factures chargées.</small>}
+    {historyError && <p role="alert" style={{ color: 'var(--danger)' }}>{historyError}</p>}
 
     <section className="invoices-summary" aria-label="Résumé des factures du mois">
       <div className="invoices-summary-card"><span className="invoices-summary-icon"><ReceiptText size={19} /></span><span>Factures ce mois</span><strong>{monthlyInvoices.length}</strong></div>
@@ -95,7 +99,7 @@ export function InvoicesPage() {
         </select>
       </div>
 
-      {currentInvoices.length === 0 ? <div className="invoices-empty"><FileText size={26} /><strong>{t('invoices_page.no_invoices', 'Aucune facture')}</strong><span>Essayez une autre recherche ou un autre filtre.</span></div> : <>
+      {currentInvoices.length === 0 ? <div className="invoices-empty"><FileText size={26} /><strong>{localSalesState.loading || historyLoading ? 'Chargement des factures…' : hasMore ? 'Aucune facture dans les pages chargées' : t('invoices_page.no_invoices', 'Aucune facture')}</strong><span>{localSalesState.loading || historyLoading ? 'Recherche des ventes de cette boutique.' : hasMore ? 'Chargez la suite de l’historique.' : 'Essayez une autre recherche ou un autre filtre.'}</span></div> : <>
         <div className="invoices-table-wrap"><table className="invoices-table"><thead><tr><th>Facture</th><th>Client</th><th>Produit</th><th>Date</th><th>Paiement</th><th>Montant</th><th><span className="sr-only">Action</span></th></tr></thead><tbody>{currentInvoices.map(invoice => <tr key={invoice.saleId}>
           <td><strong>{invoice.id}</strong></td><td>{invoice.clientName}</td><td><span className="invoices-product-name">{invoice.productName}</span></td><td>{dateLabel(invoice.date)}</td><td><span className={`invoices-payment ${invoice.paymentMethod}`}>{paymentLabels[invoice.paymentMethod] || invoice.paymentMethod}</span></td><td className="invoices-amount">{money(invoice.totalAmount)}</td><td><button type="button" className="invoices-open" onClick={() => setSelectedInvoice(invoice)} aria-label={`Voir la facture ${invoice.id}`}><Eye size={16} /></button></td>
         </tr>)}</tbody></table></div>
@@ -107,6 +111,7 @@ export function InvoicesPage() {
       </>}
     </section>
     <Pagination page={safePage} totalPages={totalPages} totalItems={filteredInvoices.length} itemLabel="facture" onPageChange={setCurrentPage} />
+    {hasMore && <button type="button" className="btn btn-secondary" disabled={loadingMore} onClick={loadMore}>{loadingMore ? 'Chargement…' : 'Charger les factures plus anciennes'}</button>}
     {selectedInvoice && <InvoicePreview invoice={selectedInvoice} shop={currentShop} onClose={() => setSelectedInvoice(null)} />}
   </main>;
 }

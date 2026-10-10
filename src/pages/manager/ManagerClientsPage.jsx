@@ -5,6 +5,7 @@ import { useShop } from '../../context/ShopContext.jsx';
 import { useTranslation } from 'react-i18next';
 import { Search, User, Users, Phone, CreditCard, X } from 'lucide-react';
 import { Pagination } from '../../components/ui/Pagination.jsx';
+import { useHybridRead } from '../../services/useHybridRead.js';
 
 export function ManagerClientsPage() {
   const { currentShop } = useShop();
@@ -24,10 +25,14 @@ export function ManagerClientsPage() {
   }, []);
   const isDesktop = windowWidth >= 768;
 
-  const clients = useQuery(queryClients(currentShop?.id || '')) || [];
-  const sales = useQuery(querySales(currentShop?.id || '')) || [];
-  const payments = useQuery(queryPayments(currentShop?.id || '')) || [];
-  const products = useQuery(queryProducts(currentShop?.id || '')) || [];
+  const localClients = useQuery(queryClients(currentShop?.id || '')) || [];
+  const localSales = useQuery(querySales(currentShop?.id || '')) || [];
+  const localPayments = useQuery(queryPayments(currentShop?.id || '')) || [];
+  const localProducts = useQuery(queryProducts(currentShop?.id || '')) || [];
+  const clients = useHybridRead('clients', currentShop?.id, localClients).records;
+  const sales = useHybridRead('sales', currentShop?.id, localSales).records;
+  const payments = useHybridRead('payments', currentShop?.id, localPayments).records;
+  const products = useHybridRead('products', currentShop?.id, localProducts).records;
 
   const clientsData = useMemo(() => {
     return clients.map(client => {

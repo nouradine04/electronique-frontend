@@ -16,8 +16,11 @@ export async function pushPendingOperations(shopId: string, retryBlocked = false
     const blocked = await collection.query(...scope, Q.where('state', 'blocked')).fetch();
     if (blocked.length) await database.write(async () => { await database.batch(...blocked.map(record => record.prepareUpdate(item => { raw(item).state = 'pending'; raw(item).error = ''; }))); });
   }
-  const operations = await collection.query(...scope, Q.where('state', 'pending'), Q.sortBy('created_at', Q.asc), Q.sortBy('id', Q.asc), Q.take(20)).fetch();
-  for (const operation of operations) {
+  // One online signal drains every pending operation in small, ordered pages.
+  for (;;) {
+    const operations = await collection.query(...scope, Q.where('state', 'pending'), Q.sortBy('created_at', Q.asc), Q.sortBy('id', Q.asc), Q.take(20)).fetch();
+    if (!operations.length) break;
+    for (const operation of operations) {
     const payload: OperationPayload = JSON.parse(String(raw(operation).payload));
     const blockedLinks = await database.get('sync_operations').query(...scope, Q.where('state', 'blocked')).fetchIds();
     if (blockedLinks.length) {
@@ -71,6 +74,7 @@ export async function pushPendingOperations(shopId: string, retryBlocked = false
     const links = await database.get('sync_operation_links').query(Q.where('operation_id', operation.id)).fetch();
     // Only the local delivery journal is deleted, after the server confirmation.
     await database.write(async () => { await database.batch(operation.prepareDestroyPermanently(), ...links.map(link => link.prepareDestroyPermanently())); });
+    }
   }
   const blockedRecords = await collection.query(...scope, Q.where('state', 'blocked')).fetch();
   const errors = [...new Set(blockedRecords.map(record => String(raw(record).error || '')).filter(Boolean))];

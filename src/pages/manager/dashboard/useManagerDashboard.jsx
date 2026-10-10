@@ -1,14 +1,17 @@
 import { BRAND } from './constants';
 
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '../../../db/useQuery.js';
+import { useQuery, useQueryState } from '../../../db/useQuery.js';
 import { queryProducts, querySales, queryClients } from '../../../db/queries.js';
 import { useShop } from '../../../context/ShopContext.jsx';
+import { useSync } from '../../../context/SyncContext.jsx';
 import { CreditCard, Smartphone, Banknote } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useHybridRead } from '../../../services/useHybridRead.js';
 
 export function useManagerDashboard({ setActiveTab }) {
   const { currentShop, userName } = useShop();
+  const { initialPullPending } = useSync();
   const { t } = useTranslation();
   const [showAlertsModal, setShowAlertsModal] = useState(false);
   const [dismissedProductIds, setDismissedProductIds] = useState(() => {
@@ -20,9 +23,12 @@ export function useManagerDashboard({ setActiveTab }) {
     }
   });
 
-  const products = useQuery(queryProducts(currentShop?.id || '')) || [];
-  const sales = useQuery(querySales(currentShop?.id || '')) || [];
-  const clients = useQuery(queryClients(currentShop?.id || '')) || [];
+  const productQuery = useQueryState(currentShop ? queryProducts(currentShop.id) : null);
+  const saleQuery = useQueryState(currentShop ? querySales(currentShop.id) : null);
+  const products = useHybridRead('products', currentShop?.id, productQuery.records).records;
+  const sales = useHybridRead('sales', currentShop?.id, saleQuery.records).records;
+  const localClients = useQuery(queryClients(currentShop?.id || '')) || [];
+  const clients = useHybridRead('clients', currentShop?.id, localClients).records;
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -194,6 +200,7 @@ export function useManagerDashboard({ setActiveTab }) {
 
   
   return {
+    loading: productQuery.loading || saleQuery.loading || (initialPullPending && !products.length && !sales.length),
     t,
     userName,
     formatDateFrench,

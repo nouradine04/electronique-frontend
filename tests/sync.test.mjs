@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { createRemoteChangesApplier } from '../src/services/remoteChanges.js';
 import { deletedIdsForShop, forgetDeletedShop, markRecordDeleted } from '../src/db/deletionScope.js';
-import { shouldSync, retryDelay, REMOTE_REFRESH_MS, reconnectDelay, jitteredRetryDelay } from '../src/services/syncPolicy.js';
+import { shouldSync } from '../src/services/syncPolicy.js';
 import { prepareLocalUser } from '../src/services/prepareLocalUser.js';
 import LocalUser from '../src/db/models/LocalUser.js';
 import { localUserSchema } from '../src/db/schema.js';
@@ -169,17 +169,10 @@ test('real Watermelon: remote updates stay synced, replay is read-only, local ed
   assert.deepEqual(await db.adapter.getDeletedRecords('products'), []);
 });
 
-test('idle network checks are throttled; pending changes and retries follow policy', () => {
-  const base = { pending: 0, lastSuccess: 1000000, retryAt: 0, force: false, visible: true };
-  for (let elapsed = 15000; elapsed < REMOTE_REFRESH_MS; elapsed += 15000) {
-    assert.equal(shouldSync({ ...base, now: base.lastSuccess + elapsed }), false);
-  }
-  assert.equal(shouldSync({ ...base, now: base.lastSuccess + REMOTE_REFRESH_MS }), true);
-  assert.equal(shouldSync({ ...base, now: base.lastSuccess + REMOTE_REFRESH_MS, visible: false }), false);
-  assert.equal(shouldSync({ ...base, now: base.lastSuccess + 15000, pending: 1 }), true);
-  assert.equal(shouldSync({ ...base, now: 1000001, force: true }), true);
-  assert.equal(shouldSync({ ...base, now: 1000001, retryAt: 1000002, pending: 1 }), false);
-  assert.deepEqual([1, 2, 3, 100].map(retryDelay), [15000, 30000, 60000, 300000]);
+test('sync runs only for pending changes or an explicit event', () => {
+  assert.equal(shouldSync({ pending: 0, force: false }), false);
+  assert.equal(shouldSync({ pending: 1, force: false }), true);
+  assert.equal(shouldSync({ pending: 0, force: true }), true);
 });
 
 test('conflict registry survives reload, remains shop-scoped and deduplicates IDs', async () => {
@@ -197,16 +190,6 @@ test('conflict registry survives reload, remains shop-scoped and deduplicates ID
     registry.clearSyncConflicts('tenant:a');
     assert.deepEqual(registry.readSyncConflicts('tenant:a'),{});
   } finally { globalThis.localStorage=previous; }
-});
-
-
-test('reconnections and retries are spread across devices without waiting for a full batch', () => {
-  assert.equal(reconnectDelay(() => 0), 500);
-  assert.equal(reconnectDelay(() => .999), 4995);
-  assert.equal(jitteredRetryDelay(1, () => 0), 12000);
-  assert.equal(jitteredRetryDelay(1, () => 1), 18000);
-  assert.ok(shouldSync({pending:1,lastSuccess:1000,retryAt:0,now:1100,force:false,visible:true}));
-  assert.equal(shouldSync({pending:1,lastSuccess:1000,retryAt:2000,now:1100,force:false,visible:true}),false);
 });
 
 

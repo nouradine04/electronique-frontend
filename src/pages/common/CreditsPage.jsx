@@ -6,6 +6,7 @@ import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, querySales, queryClients, queryPayments, queryStockMovements, queryInvoices, database, createPayment } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { Search, UserCheck, CreditCard, History, Plus } from 'lucide-react';
+import { useHybridRead } from '../../services/useHybridRead.js';
 
 export function CreditsPage() {
   const { currentShop } = useShop();
@@ -18,10 +19,13 @@ export function CreditsPage() {
   const [saving, setSaving] = useState(false);
 
   // Queries
-  const clients = useQuery(queryClients(currentShop?.id || '')) || [];
-  const sales = useQuery(querySales(currentShop?.id || '')) || [];
+  const localClients = useQuery(queryClients(currentShop?.id || '')) || [];
+  const localSales = useQuery(querySales(currentShop?.id || '')) || [];
+  const clients = useHybridRead('clients', currentShop?.id, localClients).records;
+  const sales = useHybridRead('sales', currentShop?.id, localSales).records;
   const creditSales = sales.filter(s => String(s.paymentMethod || s.payment_method || '').toLowerCase() === 'credit');
-  const payments = useQuery(queryPayments(currentShop?.id || '')) || [];
+  const localPayments = useQuery(queryPayments(currentShop?.id || '')) || [];
+  const payments = useHybridRead('payments', currentShop?.id, localPayments).records;
 
   // Compute Client Debts
   const clientsWithDebt = useMemo(() => {

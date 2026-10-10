@@ -1,8 +1,9 @@
 import { useUnitProductMatches } from '../../components/stock/useUnitProductMatches';
 import React, { useEffect, useState, useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useQuery } from '../../db/useQuery.js';
+import { useQuery, useQueryState } from '../../db/useQuery.js';
 import { useShop } from '../../context/ShopContext.jsx';
+import { useSync } from '../../context/SyncContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { queryCategories, queryProducts, createProduct, updateProduct, deleteProduct } from '../../db/queries.js';
 import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
@@ -13,10 +14,12 @@ import { ProductCard } from './catalog/ProductCard.jsx';
 import { CatalogPagination } from './catalog/CatalogPagination.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
 import { attachProductPhotoAfterSave } from '../../services/productPhotoAfterSave.js';
+import { useHybridRead } from '../../services/useHybridRead.js';
 import './catalog/catalog-shortcuts.css';
 
 export function CatalogManagementPage() {
   const { currentShop, userName, userRole } = useShop();
+  const { initialPullPending, syncError } = useSync();
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -38,15 +41,16 @@ export function CatalogManagementPage() {
   const BRAND = '#0e6ba8';
 
   // WatermelonDB reactive queries
-  const categories = useQuery(
+  const localCategories = useQuery(
     currentShop ? queryCategories(currentShop.id) : null,
     [currentShop?.id]
   ) || [];
+  const categories = useHybridRead('categories', currentShop?.id, localCategories).records;
 
-  const products = useQuery(
+  const productQuery = useQueryState(
     currentShop ? queryProducts(currentShop.id) : null,
-    [currentShop?.id]
-  ) || [];
+  );
+  const products = useHybridRead('products', currentShop?.id, productQuery.records).records;
 
   const brands = useMemo(() => {
     if (selectedCategory === 'ALL') return [];
@@ -215,7 +219,7 @@ export function CatalogManagementPage() {
       {filteredProducts.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
           <Package size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-          <p style={{ margin: 0, fontWeight: 600 }}>Aucun produit trouvé</p>
+          <p style={{ margin: 0, fontWeight: 600 }}>{productQuery.loading || initialPullPending && !products.length ? 'Chargement des produits…' : syncError && !products.length ? 'Produits indisponibles : synchronisation interrompue.' : 'Aucun produit trouvé'}</p>
         </div>
       ) : (
         <div className="catalog-results">

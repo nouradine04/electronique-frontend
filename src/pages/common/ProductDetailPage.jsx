@@ -5,8 +5,9 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useQuery } from '../../db/useQuery.js';
-import { queryMovementsByProduct, products as productsCollection } from '../../db/queries.js';
+import { queryMovementsByProduct, queryProducts } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
+import { useHybridRead } from '../../services/useHybridRead.js';
 import { LocalImage } from '../../components/common/LocalImage.jsx';
 import { AlertTriangle, CheckCircle2, MapPin, Package, Pencil, TrendingDown, TrendingUp, X, XCircle } from 'lucide-react';
 import './product-detail.css';
@@ -29,13 +30,16 @@ function movementLabel(movement) {
 }
 
 export function ProductDetailPage({ productId, onBack, onEdit, onDelete, initialUnitSearch = '' }) {
-  const { userRole, userName } = useShop();
+  const { currentShop, userRole, userName } = useShop();
   const isOwner = userRole === 'owner';
   const reducedMotion = useReducedMotion();
   const [filterType, setFilterType] = useState('ALL');
-  const allProducts = useQuery(productsCollection.query()) || [];
+  const localProducts = useQuery(queryProducts(currentShop?.id || '')) || [];
+  const allProducts = useHybridRead('products', currentShop?.id, localProducts).records;
   const product = allProducts.find(item => item.id === productId);
-  const movements = useQuery(queryMovementsByProduct(productId)) || [];
+  const localMovements = useQuery(queryMovementsByProduct(productId)) || [];
+  const movements = useHybridRead('stock_movements', currentShop?.id, localMovements, { sinceDays: 30 })
+    .records.filter(item => (item.productId || item.product_id) === productId);
 
   if (!product) return null;
 

@@ -12,7 +12,7 @@ import { LOCAL_ONLY } from './backendConfig';
 import { useShop } from './ShopContext.jsx';
 import { pullChanges, pushChanges } from '../services/syncService';
 import { applyRemoteChanges } from '../services/applyRemoteChanges.js';
-import { shouldSync, jitteredRetryDelay, reconnectDelay } from '../services/syncPolicy.js';
+import { shouldSync } from '../services/syncPolicy.js';
 import { prepareBatchMedia, recoverLocalProductMedia } from '../services/syncMedia.js';
 import { snapshotBatch } from '../services/syncSnapshot';
 import { pushPendingOperations, pendingOperationCount } from '../services/syncOperations';
@@ -21,11 +21,7 @@ import { canWorkOffline, ensureAccessToken, getSession } from '../services/sessi
 
 const SyncContext = createContext();
 
-const RETRY_INTERVAL = 15000; // 15s entre les tentatives
-const SYNC_ON_FOCUS = true;   // Re-sync quand l'onglet devient actif
-const ACTIVATION_PULL_GAP = 20 * 1000;
 const SYNC_BATCH_SIZE = 500;
-const MAX_PUSH_BATCHES_PER_RUN = 10;
 const HELD_RETRY_INTERVAL = 10 * 60 * 1000;
 const cloudImage = value => value == null || value === ''
   ? null
@@ -70,10 +66,11 @@ export function SyncProvider({ children }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncError, setSyncError] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
-  const retryTimer = useRef(null);
+  const [lastSyncedShopId, setLastSyncedShopId] = useState('');
   const syncLock = useRef(false);
-  const lastActivationPull = useRef(0);
-  const syncSchedule = useRef({ key: '', lastSuccess: 0, retryAt: 0, failures: 0 });
+  const syncAgainAfterCurrent = useRef(false);
+  const initialPullKey = useRef('');
+  const syncSchedule = useRef({ key: '', lastHeldRetryAt: 0 });
 
   // Mise à jour du compteur de pending en temps réel
   const refreshPendingCount = useCallback(async () => {
@@ -279,20 +276,24 @@ export function SyncProvider({ children }) {
     if (getSession()?.userId !== localStorage.getItem('currentUserId')) return;
 
     syncLock.current = true;
+    let failed = false;
     try {
       const tenantId = currentShop.accountId || currentShop.id;
       const cursorKey = `lastPulledAt:${tenantId}:${currentShop.id}`;
       if (syncSchedule.current.key !== cursorKey) {
-        syncSchedule.current = { key: cursorKey, lastSuccess: 0, retryAt: syncSchedule.current.retryAt, failures: 0, lastHeldRetryAt: 0 };
+        syncSchedule.current = { key: cursorKey, lastHeldRetryAt: 0 };
       }
       const schedule = syncSchedule.current;
       const retryHeld = force === true || Date.now() - (schedule.lastHeldRetryAt || 0) >= HELD_RETRY_INTERVAL;
       let excluded = retryHeld ? {} : readSyncConflicts(cursorKey);
       const pending = (await getUnsyncedRecords(currentShop.id, userRole === 'owner', 1, excluded)).total + await pendingOperationCount(currentShop.id);
-      if (!shouldSync({ ...schedule, pending, now: Date.now(), force: force === true, visible: document.visibilityState !== 'hidden' })) return;
+      if (!shouldSync({ pending, force: force === true })) return;
+      setSyncError('');
       setIsSyncing(true);
       await ensureAccessToken();
       const storedPullTimestamp = Number(localStorage.getItem(cursorKey) || 0);
+      const historyBackfillKey = `offlineHistory30:${tenantId}:${currentShop.id}`;
+      const needsHistoryBackfill = localStorage.getItem(historyBackfillKey) !== 'done';
       if (retryHeld) {
         clearSyncConflicts(cursorKey);
         schedule.lastHeldRetryAt = Date.now();
@@ -300,7 +301,7 @@ export function SyncProvider({ children }) {
       const operationState = await pushPendingOperations(currentShop.id, retryHeld);
       const mediaState = await recoverLocalProductMedia(currentShop.id);
       let failedMediaCount = mediaState.failed;
-      for (let batchIndex = 0; batchIndex < MAX_PUSH_BATCHES_PER_RUN; batchIndex += 1) {
+      for (;;) {
         let batch = await getUnsyncedRecords(
           currentShop.id,
           userRole === 'owner',
@@ -335,36 +336,42 @@ export function SyncProvider({ children }) {
       let finalPullTimestamp = null;
       do {
         const response = await pullChanges({
-          lastPulledAt: storedPullTimestamp,
+          lastPulledAt: needsHistoryBackfill ? 0 : storedPullTimestamp,
           tenantId,
           shopId: currentShop.id,
           cursor: pullCursor,
           limit: SYNC_BATCH_SIZE,
         });
+        if (needsHistoryBackfill && !(Number(response.initial_history_days) >= 30)) {
+          throw new Error('La version du serveur ne permet pas encore le rattrapage des 30 derniers jours.');
+        }
         await applyRemoteChanges(response.changes);
         finalPullTimestamp = response.timestamp;
         pullCursor = response.next_cursor;
       } while (pullCursor);
       if (finalPullTimestamp) {
         localStorage.setItem(cursorKey, String(finalPullTimestamp));
+        if (needsHistoryBackfill) localStorage.setItem(historyBackfillKey, 'done');
       }
 
       setLastSyncedAt(new Date());
+      setLastSyncedShopId(currentShop.id);
       const held = Object.values(excluded).reduce((count, ids) => count + ids.length, 0);
-      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) à vérifier. ${operationState.errors[0] || ''} Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : failedMediaCount ? `${failedMediaCount} photo(s) en attente d’envoi. Réessai automatique après quelques minutes.` : '');
-      schedule.lastSuccess = Date.now();
-      schedule.failures = 0;
-      schedule.retryAt = 0;
+      setSyncError(operationState.blocked ? `${operationState.blocked} opération(s) à vérifier. ${operationState.errors[0] || ''} Les données sont conservées ; les autres envois continuent.` : held ? `${held} élément(s) en conflit ou en attente de validation. Les autres données continuent à se synchroniser.` : failedMediaCount ? `${failedMediaCount} photo(s) conservée(s) localement. Un nouvel essai aura lieu à la prochaine action ou ouverture.` : '');
       await refreshPendingCount();
+      if (pending > 0) window.dispatchEvent(new CustomEvent('nstock:sync-complete', { detail: { shopId: currentShop.id } }));
 
     } catch (err) {
-      setSyncError(err.status === 409 ? 'Conflit de synchronisation. Les données restent sur cet appareil.' : 'Synchronisation interrompue. Les données restent sur cet appareil et un nouvel essai sera fait automatiquement.');
-      syncSchedule.current.failures += 1;
-      syncSchedule.current.retryAt = Date.now() + jitteredRetryDelay(syncSchedule.current.failures);
+      failed = true;
+      setSyncError(err.status === 409 ? 'Conflit de synchronisation. Les données restent sur cet appareil.' : 'Synchronisation interrompue. Les données restent sur cet appareil ; réessayez à la prochaine action ou au retour du réseau.');
       console.warn('[Sync] Échec — données conservées localement:', err.message);
     } finally {
       syncLock.current = false;
       setIsSyncing(false);
+      if (syncAgainAfterCurrent.current) {
+        syncAgainAfterCurrent.current = false;
+        if (!failed && navigator.onLine) setTimeout(() => void syncWithBackend(), 0);
+      }
     }
   }, [buildChangesPayload, currentShop, refreshPendingCount, userRole]);
 
@@ -373,7 +380,13 @@ export function SyncProvider({ children }) {
     let timer;
     const onWrite = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => { void refreshPendingCount(); void syncWithBackend(); }, 750);
+      void refreshPendingCount();
+      if (!navigator.onLine) return;
+      timer = setTimeout(() => {
+        if (!navigator.onLine) return;
+        if (syncLock.current) syncAgainAfterCurrent.current = true;
+        else void syncWithBackend();
+      }, 750);
     };
     window.addEventListener('nstock:local-write', onWrite);
     return () => { clearTimeout(timer); window.removeEventListener('nstock:local-write', onWrite); };
@@ -381,85 +394,50 @@ export function SyncProvider({ children }) {
 
   // Écoute online/offline
   useEffect(() => {
-    let reconnectTimer;
     const handleOnline = () => {
       setIsOnline(true);
-      const delay = reconnectDelay();
-      syncSchedule.current.retryAt = Math.max(syncSchedule.current.retryAt, Date.now() + delay);
-      clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => syncWithBackend(true), delay + 10);
+      void syncWithBackend(true);
     };
     const handleOffline = () => {
       setIsOnline(false);
-      if (retryTimer.current) clearInterval(retryTimer.current);
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
-      clearTimeout(reconnectTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, [syncWithBackend]);
 
-  // Auto-retry quand online
+  // Synchronisation initiale à l'ouverture d'une boutique ; le retour réseau
+  // est pris en charge exclusivement par l'écouteur online ci-dessus.
   useEffect(() => {
-    if (!LOCAL_ONLY && isOnline) {
-      retryTimer.current = setInterval(syncWithBackend, RETRY_INTERVAL);
-    }
-    return () => {
-      if (retryTimer.current) clearInterval(retryTimer.current);
-    };
-  }, [isOnline, syncWithBackend]);
+    if (LOCAL_ONLY || !navigator.onLine || !currentShop) return;
+    const key = `${getSession()?.userId || ''}:${currentShop.id}`;
+    if (initialPullKey.current === key) return;
+    initialPullKey.current = key;
+    void syncWithBackend(true);
+  }, [currentShop, syncWithBackend]);
 
-  // Synchronisation immédiate à l'ouverture d'une boutique. Les retries et
-  // l'événement `online` prennent ensuite le relais sans demander à l'utilisateur.
+  // Compteur initial ; les écritures et les confirmations le mettent ensuite à jour.
   useEffect(() => {
-    if (LOCAL_ONLY || !isOnline || !currentShop) return;
-    lastActivationPull.current = Date.now();
-    const timer = setTimeout(() => syncWithBackend(true), reconnectDelay());
-    return () => clearTimeout(timer);
-  }, [currentShop, isOnline, syncWithBackend]);
-
-  // Une autre machine peut avoir modifié la boutique depuis le dernier pull.
-  // Le retour sur l'application force une lecture, sans attendre le délai de
-  // rafraîchissement normal. Limiter les événements focus/visibility doublons.
-  useEffect(() => {
-    if (LOCAL_ONLY || !SYNC_ON_FOCUS) return;
-    const handleActivation = () => {
-      if (!isOnline || document.visibilityState === 'hidden') return;
-      const now = Date.now();
-      if (now - lastActivationPull.current < ACTIVATION_PULL_GAP) return;
-      lastActivationPull.current = now;
-      void syncWithBackend(true);
-    };
-    window.addEventListener('focus', handleActivation);
-    window.addEventListener('nstock:view-activated', handleActivation);
-    document.addEventListener('visibilitychange', handleActivation);
-    return () => {
-      window.removeEventListener('focus', handleActivation);
-      window.removeEventListener('nstock:view-activated', handleActivation);
-      document.removeEventListener('visibilitychange', handleActivation);
-    };
-  }, [isOnline, syncWithBackend]);
-
-  // Compteur initial
-  useEffect(() => {
-    refreshPendingCount();
-    const iv = setInterval(refreshPendingCount, 10000);
-    return () => clearInterval(iv);
+    void refreshPendingCount();
   }, [refreshPendingCount]);
 
   const triggerManualSync = useCallback(() => {
     if (isOnline) syncWithBackend(true);
   }, [isOnline, syncWithBackend]);
 
+  const initialPullPending = Boolean(!LOCAL_ONLY && isOnline && currentShop && canWorkOffline() &&
+    lastSyncedShopId !== currentShop.id && !syncError);
+
   return (
     <SyncContext.Provider value={{
       isOnline,
       isLocalOnly: LOCAL_ONLY,
       isSyncing,
+      initialPullPending,
       pendingCount,
       syncError,
       lastSyncedAt,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useQuery } from '../../db/useQuery.js';
+import { useQuery, useQueryState } from '../../db/useQuery.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { querySales, queryProducts, queryClients, queryReturns, processSaleReturn } from '../../db/queries.js';
@@ -8,6 +8,7 @@ import { LocalImage } from '../../components/common/LocalImage.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { Search, Filter, Calendar, Banknote, Receipt, CreditCard, AlertCircle, Check, RotateCcw, Package } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useSaleHistory } from '../../services/useSaleHistory.js';
 import './transactions-list.css';
 
 export function TransactionsPage() {
@@ -28,10 +29,10 @@ export function TransactionsPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const allSales = useQuery(
+  const localSalesState = useQueryState(
     currentShop ? querySales(currentShop.id) : null,
-    [currentShop?.id]
-  ) || [];
+  );
+  const { sales: allSales, loading: historyLoading, loadingMore, hasMore, error: historyError, loadMore } = useSaleHistory(currentShop?.id, localSalesState.records);
 
   const allProducts = useQuery(
     currentShop ? queryProducts(currentShop.id) : null,
@@ -58,6 +59,9 @@ export function TransactionsPage() {
     });
     return result;
   }, [allReturns]);
+  const returnForSale = sale => returnsBySale.get(sale.id) || {
+    quantity: Number(sale.returnedQuantity || 0), refund: Number(sale.refundedAmount || 0),
+  };
 
   const getDateRange = (filter) => {
     const now = new Date();
@@ -93,7 +97,7 @@ export function TransactionsPage() {
       const product = allProducts.find(p => p.id === sale.productId);
       const client = allClients.find(c => c.id === sale.clientId);
       const q = (searchQuery || '').toLowerCase();
-      if (q && !(product?.name || '').toLowerCase().includes(q) && !(client?.name || '').toLowerCase().includes(q)) return false;
+      if (q && !(product?.name || sale.productName || '').toLowerCase().includes(q) && !(client?.name || sale.clientName || '').toLowerCase().includes(q)) return false;
       return true;
     });
   }, [allSales, allProducts, allClients, timeFilter, customDate, paymentFilter, searchQuery]);
@@ -105,13 +109,13 @@ export function TransactionsPage() {
 
   const totalEncaisse = filteredSales
     .filter(sale => sale.paymentMethod !== 'credit')
-    .reduce((total, sale) => total + (Number(sale.totalPrice) || 0) - (returnsBySale.get(sale.id)?.refund || 0), 0);
+    .reduce((total, sale) => total + (Number(sale.totalPrice) || 0) - returnForSale(sale).refund, 0);
   const totalCredit = filteredSales
     .filter(sale => sale.paymentMethod === 'credit')
-    .reduce((total, sale) => total + (Number(sale.totalPrice) || 0) - (returnsBySale.get(sale.id)?.refund || 0), 0);
+    .reduce((total, sale) => total + (Number(sale.totalPrice) || 0) - returnForSale(sale).refund, 0);
 
   const handleReturn = async data => {
-    const sale = selectedReturnSale;
+    const sale = selectedReturnSale?.localRecord || selectedReturnSale;
     const product = allProducts.find(item => item.id === sale?.productId);
     try {
       await processSaleReturn({
@@ -224,6 +228,8 @@ export function TransactionsPage() {
         <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
           {userRole === 'owner' ? 'Toutes les transactions' : 'Toutes les ventes et leurs vendeurs'} de {currentShop.name}
         </p>
+        {hasMore && <small>Historique chargé progressivement. Les montants affichés concernent les ventes chargées.</small>}
+        {historyError && <p role="alert" style={{ color: 'var(--danger)' }}>{historyError}</p>}
       </div>
 
       {/* Stats */}
@@ -319,16 +325,16 @@ export function TransactionsPage() {
         {filteredSales.length === 0 ? (
           <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <AlertCircle size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-            <p style={{ fontSize: '16px', fontWeight: 500 }}>{userRole === 'owner' ? 'Aucune transaction trouvée' : 'Aucune vente trouvée'}</p>
+            <p style={{ fontSize: '16px', fontWeight: 500 }}>{localSalesState.loading || historyLoading ? 'Chargement des ventes…' : hasMore ? 'Aucune vente dans les pages chargées. Chargez la suite de l’historique.' : userRole === 'owner' ? 'Aucune transaction trouvée' : 'Aucune vente trouvée'}</p>
           </div>
         ) : isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px' }}>
             {paginatedSales.map((sale, idx) => {
               const product = allProducts.find(p => p.id === sale.productId);
               const client = allClients.find(c => c.id === sale.clientId);
-              const returnInfo = returnsBySale.get(sale.id) || { quantity: 0, refund: 0 };
+              const returnInfo = returnForSale(sale);
               const isOwnSale = canUserReturnSale(sale);
-              const canReturn = Boolean(product) && isOwnSale && returnInfo.quantity < Number(sale.quantity || 0);
+              const canReturn = !sale.remoteOnly && Boolean(product) && isOwnSale && returnInfo.quantity < Number(sale.quantity || 0);
               const netAmount = Number(sale.totalPrice || 0) - Number(returnInfo.refund || 0);
               return (
                 <div key={sale.id || idx} className="tp-transaction-card tp-sale-card">
@@ -336,8 +342,8 @@ export function TransactionsPage() {
                     <div className="tp-sale-product">
                       <span className="tp-sale-thumb"><LocalImage src={product?.imageUrl || product?.image_url} alt="" loading="lazy" fallback={<Package size={19} aria-hidden="true" />} /></span>
                       <span className="tp-sale-product-copy">
-                        <strong>{product?.name || 'Produit inconnu'}</strong>
-                        <small>Client : {client?.name || 'Anonyme'}</small>
+                        <strong>{product?.name || sale.productName || 'Produit inconnu'}</strong>
+                        <small>Client : {client?.name || sale.clientName || 'Anonyme'}</small>
                       </span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -391,17 +397,17 @@ export function TransactionsPage() {
                 {paginatedSales.map((sale, idx) => {
                   const product = allProducts.find(p => p.id === sale.productId);
                   const client = allClients.find(c => c.id === sale.clientId);
-                  const returnInfo = returnsBySale.get(sale.id) || { quantity: 0, refund: 0 };
-                  const canReturn = Boolean(product) && canUserReturnSale(sale) && returnInfo.quantity < Number(sale.quantity || 0);
+                  const returnInfo = returnForSale(sale);
+                  const canReturn = !sale.remoteOnly && Boolean(product) && canUserReturnSale(sale) && returnInfo.quantity < Number(sale.quantity || 0);
                   const netAmount = Number(sale.totalPrice || 0) - Number(returnInfo.refund || 0);
                   return (
                     <tr key={sale.id || idx}>
                       <td><span className="tp-sale-product">
                         <span className="tp-sale-thumb"><LocalImage src={product?.imageUrl || product?.image_url} alt="" loading="lazy" fallback={<Package size={19} aria-hidden="true" />} /></span>
-                        <strong className="tp-sale-product-copy">{product?.name || 'Produit inconnu'}</strong>
+                        <strong className="tp-sale-product-copy">{product?.name || sale.productName || 'Produit inconnu'}</strong>
                       </span></td>
-                      <td style={{ color: client ? 'var(--text-primary)' : 'var(--text-muted)', fontStyle: client ? 'normal' : 'italic' }}>
-                        {client?.name || 'Anonyme'}
+                      <td style={{ color: client || sale.clientName ? 'var(--text-primary)' : 'var(--text-muted)', fontStyle: client || sale.clientName ? 'normal' : 'italic' }}>
+                        {client?.name || sale.clientName || 'Anonyme'}
                       </td>
                       <td className="tp-sale-seller">
                         {sale.sellerName
@@ -435,6 +441,7 @@ export function TransactionsPage() {
         )}
       </div>
       <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredSales.length} itemLabel="vente" onPageChange={setCurrentPage} />
+      {hasMore && <button type="button" className="btn btn-secondary" disabled={loadingMore} onClick={loadMore}>{loadingMore ? 'Chargement…' : 'Charger les ventes plus anciennes'}</button>}
 
       {selectedReturnSale && (
         <ReturnSaleModal
