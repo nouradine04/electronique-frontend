@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { Q } from '@nozbe/watermelondb';
 import { Search, FileText, Eye, ReceiptText, Wallet, CreditCard } from 'lucide-react';
 import { useQuery, useQueryState } from '../../db/useQuery.js';
-import { queryProducts, querySales, queryClients } from '../../db/queries.js';
+import { queryProducts, querySales, queryClients, database } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { InvoicePreview } from '../../components/finance/InvoicePreview.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
@@ -30,26 +31,42 @@ export function InvoicesPage() {
   const { sales, loading: historyLoading, loadingMore, hasMore, error: historyError, loadMore } = useSaleHistory(currentShop?.id, localSalesState.records);
   const products = useQuery(queryProducts(currentShop?.id || '')) || [];
   const clients = useQuery(queryClients(currentShop?.id || '')) || [];
+  const localUnitEvents = useQuery(database.get('unit_events').query(Q.where('shop_id', currentShop?.id || ''), Q.where('kind', 'SOLD'))) || [];
+  const localUnits = useQuery(database.get('product_units').query(Q.where('shop_id', currentShop?.id || ''))) || [];
 
   const invoices = useMemo(() => {
     const productsById = new Map(products.map(product => [product.id, product]));
     const clientsById = new Map(clients.map(client => [client.id, client]));
+    const unitsById = new Map(localUnits.map(unit => [unit.id, unit._raw]));
+    const identifiersBySale = new Map();
+    for (const event of localUnitEvents) {
+      const raw = event._raw;
+      const unit = unitsById.get(raw.unit_id);
+      if (!unit || !raw.sale_id) continue;
+      const entries = identifiersBySale.get(raw.sale_id) || [];
+      entries.push({ identifier: unit.identifier, identifier_type: unit.identifier_type });
+      identifiersBySale.set(raw.sale_id, entries);
+    }
     return sales.map(sale => {
       const client = clientsById.get(sale.clientId);
+      const product = productsById.get(sale.productId);
+      const productRaw = product?._raw || product;
       return {
         id: `FAC-${String(sale.id).slice(-6).toUpperCase()}`,
         saleId: sale.id,
         date: sale.date,
         clientName: client?.name || sale.clientName || 'Client comptoir',
         clientPhone: client?.phone || sale.clientPhone || '',
-        productName: productsById.get(sale.productId)?.name || sale.productName || 'Produit indisponible',
+        productName: product?.name || sale.productName || 'Produit indisponible',
+        productDetails: sale.productDetails || [productRaw?.storage_capacity, productRaw?.color, productRaw?.sim_type].filter(Boolean).join(' · '),
+        unitIdentifiers: sale.unitIdentifiers?.length ? sale.unitIdentifiers : identifiersBySale.get(sale.id) || [],
         quantity: Number(sale.quantity || 1),
         unitPrice: Number(sale.totalPrice || 0) / Number(sale.quantity || 1),
         totalAmount: Number(sale.totalPrice || 0),
         paymentMethod: sale.paymentMethod || 'cash',
       };
     });
-  }, [sales, clients, products]);
+  }, [sales, clients, products, localUnitEvents, localUnits]);
 
   const filteredInvoices = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase('fr');

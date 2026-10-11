@@ -1,0 +1,6 @@
+.history-modal-overlay{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:16px;background:rgba(15,23,42,.62)}
+.history-modal-dialog{display:flex;flex-direction:column;width:min(100%,680px);max-height:calc(100dvh - 32px);min-height:0;overflow:hidden;border:1px solid var(--border-color);border-radius:18px;background:var(--bg-surface);box-shadow:0 25px 70px rgba(8,28,48,.28)}
+.history-modal-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.history-modal-footer{flex:none;padding:10px 16px;border-top:1px solid var(--border-color);background:var(--bg-surface)}
+.history-modal-footer nav{margin:0}
+@media(max-width:600px){.history-modal-overlay{padding:10px}.history-modal-dialog{max-height:calc(100dvh - 20px);border-radius:16px}.history-modal-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.history-modal-summary>div{min-width:0;overflow-wrap:anywhere}}

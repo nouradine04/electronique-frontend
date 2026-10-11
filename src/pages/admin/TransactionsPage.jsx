@@ -13,7 +13,7 @@ import './transactions-list.css';
 
 export function TransactionsPage() {
   const { t } = useTranslation();
-  const { currentShop, userRole, userName } = useShop();
+  const { currentShop, userName } = useShop();
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState('tout');
@@ -223,10 +223,10 @@ export function TransactionsPage() {
 
       <div style={{ marginBottom: isMobile ? '18px' : '24px' }}>
         <h1 style={{ fontSize: isMobile ? '21px' : '24px', fontWeight: 'bold', margin: '0 0 8px', color: 'var(--text-primary)' }}>
-          {userRole === 'owner' ? 'Historique des transactions' : 'Ventes'}
+          Ventes
         </h1>
         <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-          {userRole === 'owner' ? 'Toutes les transactions' : 'Toutes les ventes et leurs vendeurs'} de {currentShop.name}
+          Toutes les ventes et leurs vendeurs de {currentShop.name}
         </p>
         {hasMore && <small>Historique chargé progressivement. Les montants affichés concernent les ventes chargées.</small>}
         {historyError && <p role="alert" style={{ color: 'var(--danger)' }}>{historyError}</p>}
@@ -325,7 +325,7 @@ export function TransactionsPage() {
         {filteredSales.length === 0 ? (
           <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <AlertCircle size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-            <p style={{ fontSize: '16px', fontWeight: 500 }}>{localSalesState.loading || historyLoading ? 'Chargement des ventes…' : hasMore ? 'Aucune vente dans les pages chargées. Chargez la suite de l’historique.' : userRole === 'owner' ? 'Aucune transaction trouvée' : 'Aucune vente trouvée'}</p>
+            <p style={{ fontSize: '16px', fontWeight: 500 }}>{localSalesState.loading || historyLoading ? 'Chargement des ventes…' : hasMore ? 'Aucune vente dans les pages chargées. Chargez la suite de l’historique.' : 'Aucune vente trouvée'}</p>
           </div>
         ) : isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px' }}>

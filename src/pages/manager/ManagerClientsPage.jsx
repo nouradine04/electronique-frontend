@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, queryCategories, querySales, queryClients, queryPayments, queryStockMovements, queryInvoices, database, createPayment } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
@@ -6,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Search, User, Users, Phone, CreditCard, X } from 'lucide-react';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { useHybridRead } from '../../services/useHybridRead.js';
+import '../../components/ui/history-modal.css';
 
 export function ManagerClientsPage() {
   const { currentShop } = useShop();
@@ -16,6 +18,8 @@ export function ManagerClientsPage() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyContentRef = useRef(null);
   
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   useEffect(() => {
@@ -36,17 +40,16 @@ export function ManagerClientsPage() {
 
   const clientsData = useMemo(() => {
     return clients.map(client => {
-      const clientSales = sales.filter(s => s.client_id === client.id);
-      const clientPayments = payments.filter(p => p.client_id === client.id);
+      const clientSales = sales.filter(s => (s.clientId || s.client_id) === client.id);
+      const clientPayments = payments.filter(p => (p.clientId || p.client_id) === client.id);
       
-      const totalPurchased = clientSales.reduce((sum, s) => sum + (s.total_price || 0), 0);
-      const totalPaid = clientPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-      const currentDebt = totalPurchased - totalPaid;
-      
-      let lastPurchaseDate = null;
-      if (clientSales.length > 0) {
-        lastPurchaseDate = clientSales.sort((a, b) => new Date(b.date) - new Date(a.date))[0].date;
-      }
+      const totalPurchased = clientSales.reduce((sum, s) => sum + Number(s.totalPrice ?? s.total_price ?? 0), 0);
+      const totalPaid = clientPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
+        + clientSales.filter(s => String(s.paymentMethod || s.payment_method || '').toLowerCase() !== 'credit')
+          .reduce((sum, s) => sum + Number(s.totalPrice ?? s.total_price ?? 0), 0);
+      const currentDebt = Math.max(0, totalPurchased - totalPaid);
+      const sortedSales = [...clientSales].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const lastPurchaseDate = sortedSales[0]?.date || null;
 
       return {
         ...client,
@@ -58,7 +61,7 @@ export function ManagerClientsPage() {
         currentDebt,
         lastPurchaseDate,
         purchaseCount: clientSales.length,
-        sales: clientSales.sort((a, b) => new Date(b.date) - new Date(a.date))
+        sales: sortedSales
       };
     });
   }, [clients, sales, payments]);
@@ -109,8 +112,8 @@ export function ManagerClientsPage() {
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) return;
 
-    if (amount > selectedClient.currentDebt) {
-      alert("Le montant remboursé ne peut pas dépasser la dette totale (" + selectedClient.currentDebt + " FCFA).");
+    if (amount > currentSelectedClient.currentDebt) {
+      alert("Le montant remboursé ne peut pas dépasser la dette totale (" + currentSelectedClient.currentDebt + " FCFA).");
       return;
     }
 
@@ -128,6 +131,18 @@ export function ManagerClientsPage() {
   };
 
   const currentSelectedClient = selectedClient ? clientsData.find(c => c.id === selectedClient.id) : null;
+  const historyPageSize = 8;
+  const historyPages = Math.max(1, Math.ceil((currentSelectedClient?.sales.length || 0) / historyPageSize));
+  useEffect(() => { setHistoryPage(1); }, [selectedClient?.id]);
+  useEffect(() => { historyContentRef.current?.scrollTo({ top: 0 }); }, [historyPage]);
+  useEffect(() => {
+    if (!currentSelectedClient) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = event => { if (event.key === 'Escape') setSelectedClient(null); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', onKeyDown); };
+  }, [currentSelectedClient?.id]);
 
   return (
     <div style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'inherit', paddingBottom: '80px' }}>
@@ -390,30 +405,13 @@ export function ManagerClientsPage() {
       )}
       <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredClients.length} itemLabel="client" onPageChange={setCurrentPage} />
 
-      {/* Bottom Sheet Modal */}
-      {currentSelectedClient && (
-        <>
+      {currentSelectedClient && createPortal(
+        <div className="history-modal-overlay" onClick={() => setSelectedClient(null)}>
           <div 
-            style={{
-              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 999
-            }}
-            onClick={() => setSelectedClient(null)}
-          />
-          <div 
-            style={{
-              position: 'fixed', bottom: 0, left: 0, right: 0,
-              backgroundColor: 'var(--bg-main)',
-              borderTopLeftRadius: '20px', borderTopRightRadius: '20px',
-              padding: '24px',
-              zIndex: 1000,
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              transform: 'translateY(0)',
-              transition: 'transform 0.3s ease-out',
-              boxShadow: '0 -4px 12px rgba(0,0,0,0.1)'
-            }}
+            className="history-modal-dialog" role="dialog" aria-modal="true" aria-label={`Historique de ${currentSelectedClient.name}`}
+            onClick={event => event.stopPropagation()}
           >
+            <div className="history-modal-content" ref={historyContentRef} style={{ padding: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
               <div>
                 <h2 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{currentSelectedClient.name}</h2>
@@ -463,15 +461,15 @@ export function ManagerClientsPage() {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {currentSelectedClient.sales.length > 0 ? (
-                currentSelectedClient.sales.map(sale => (
+                currentSelectedClient.sales.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize).map(sale => (
                   <div key={sale.id} style={{ backgroundColor: 'var(--bg-surface)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{getProductName(sale.product_id)}</span>
-                      <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{formatCurrency(sale.total_price)}</span>
+                      <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{getProductName(sale.productId || sale.product_id)}</span>
+                      <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{formatCurrency(sale.totalPrice ?? sale.total_price)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)' }}>
                       <span>{formatDate(sale.date)} • Qté: {sale.quantity}</span>
-                      {String(sale.payment_method || '').toLowerCase() === 'credit' ? (
+                      {String(sale.paymentMethod || sale.payment_method || '').toLowerCase() === 'credit' ? (
                         <span className="badge badge-credit">Crédit</span>
                       ) : (
                         <span>Comptant</span>
@@ -483,9 +481,10 @@ export function ManagerClientsPage() {
                 <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Aucun achat trouvé.</div>
               )}
             </div>
-
+            </div>
+            <div className="history-modal-footer"><Pagination page={historyPage} totalPages={historyPages} totalItems={currentSelectedClient.sales.length} itemLabel="vente" onPageChange={setHistoryPage} /></div>
           </div>
-        </>
+        </div>, document.body
       )}
 
     </div>

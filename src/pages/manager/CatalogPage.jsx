@@ -124,16 +124,14 @@ export function CatalogManagementPage() {
   useEffect(() => setSelectedBrand('ALL'), [currentShop?.id]);
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
-  const pendingCount = products.filter(p => p.status === 'PENDING_PRICE').length;
-  const outOfStockCount = products.filter(p => p.quantity === 0 && p.status !== 'PENDING_PRICE').length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px 0 32px' }}>
+    <div className="catalog-page" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px 0 32px' }}>
       
       {/* Header Row */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="catalog-header" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>Produits</h2>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="catalog-header-actions" style={{ display: 'flex', gap: '12px' }}>
           <button 
             onClick={() => setShowAddCategory(true)}
             style={{ padding: '8px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'transparent', fontWeight: 600, cursor: 'pointer' }}
@@ -147,13 +145,6 @@ export function CatalogManagementPage() {
             <Plus size={18} /> Ajouter un produit
           </button>
         </div>
-      </div>
-
-      {/* Stats bar (plain text summary) */}
-      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', gap: '16px', flexWrap: 'wrap', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginTop: '-8px' }}>
-        <span>Total produits : <strong style={{ color: 'var(--text-primary)' }}>{products.length}</strong></span>
-        <span>En attente : <strong style={{ color: pendingCount > 0 ? '#c71f37' : 'var(--text-primary)' }}>{pendingCount}</strong></span>
-        <span>Ruptures : <strong style={{ color: outOfStockCount > 0 ? 'var(--danger)' : 'var(--text-primary)' }}>{outOfStockCount}</strong></span>
       </div>
 
       {/* Filters (with dropdown status filter to the right of search input) */}

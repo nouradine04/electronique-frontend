@@ -5,6 +5,7 @@ import { imageAsDataUrl } from './localMedia.js';
 export interface InvoiceDocument {
   id: string; date: string; clientName: string; clientPhone?: string;
   productName: string; quantity: number; unitPrice: number; totalAmount: number; paymentMethod: string;
+  productDetails?: string; unitIdentifiers?: { identifier: string; identifier_type: string }[];
 }
 export interface InvoiceShop { name?: string; address?: string; phone?: string; email?: string; nif?: string; logoUrl?: string; logo_url?: string }
 const amount = (n: number) => `${Number(n || 0).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} FCFA`;
@@ -33,7 +34,7 @@ export async function buildInvoicePdf(invoice: InvoiceDocument, shop: InvoiceSho
   const reference = doc.splitTextToSize(`N° ${invoice.id}`, 72);
   doc.text(reference, 192, 34, { align: 'right' });
   doc.setTextColor(71, 85, 105); doc.setFont('helvetica', 'normal');
-  doc.text(`Date : ${new Date(invoice.date).toLocaleDateString('fr-FR')}`, 192, 39 + reference.length * 4, { align: 'right' });
+  doc.text(`Date : ${new Date(invoice.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`, 192, 39 + reference.length * 4, { align: 'right' });
   const top = Math.max(64, titleY + nameLines.length * 8 + 10, 50 + reference.length * 4);
   doc.setDrawColor(221, 231, 239); doc.setLineWidth(.3); doc.line(18, top - 9, 192, top - 9);
   doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...blue); doc.text('VOTRE BOUTIQUE', 18, top); doc.text('FACTURÉ À', 118, top);
@@ -45,7 +46,7 @@ export async function buildInvoicePdf(invoice: InvoiceDocument, shop: InvoiceSho
   const tableY = top + 23 + Math.max(sender.length, recipient.length) * 5;
   autoTable(doc, { startY: tableY, margin: { left: 18, right: 18, bottom: 25 }, theme: 'plain',
     head: [['DÉSIGNATION', 'QTÉ', 'PRIX UNITAIRE', 'MONTANT']],
-    body: [[invoice.productName, invoice.quantity, amount(invoice.unitPrice), amount(invoice.totalAmount)]],
+    body: [[[invoice.productName, invoice.productDetails, ...(invoice.unitIdentifiers || []).map(unit => `${unit.identifier_type === 'IMEI' ? 'IMEI' : 'N° série'} : ${unit.identifier}`)].filter(Boolean).join('\n'), invoice.quantity, amount(invoice.unitPrice), amount(invoice.totalAmount)]],
     styles: { font: 'helvetica', fontSize: 10, cellPadding: 5, overflow: 'linebreak', textColor: [30, 41, 59] },
     headStyles: { fillColor: blue, textColor: [255, 255, 255], fontSize: 8, cellPadding: 3, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [248, 250, 252] },

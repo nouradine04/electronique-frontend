@@ -47,3 +47,12 @@
   outline: 2px solid #0e6ba8;
   outline-offset: 2px;
 }
+@media (max-width: 600px) {
+  .catalog-header { align-items: stretch !important; }
+  .catalog-header-actions { width: 100%; flex-wrap: wrap; gap: 8px !important; }
+  .catalog-header-actions button { min-height: 44px; }
+}
+@media (max-width: 420px) {
+  .catalog-header-actions { flex-direction: column; }
+  .catalog-header-actions button { width: 100%; justify-content: center; }
+}

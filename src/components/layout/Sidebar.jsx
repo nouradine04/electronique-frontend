@@ -150,7 +150,7 @@ export function Sidebar({ activeTab, setActiveTab, isMobileMenuOpen }) {
 
           {/* Only manager accesses Catalog Add */}
           {userRole === 'manager' && (
-            <NavItem id="add" icon={PackagePlus} label={t('sidebar.catalog')} />
+            <NavItem id="add" icon={PackagePlus} label={t('sidebar.products')} />
           )}
 
           {/* New CRM page link for owner */}

@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '../../db/useQuery.js';
 import { queryProducts, querySales, queryClients, queryPayments } from '../../db/queries.js';
@@ -6,6 +7,7 @@ import { useShop } from '../../context/ShopContext.jsx';
 import { FaTimes, FaSearch, FaChevronRight, FaPhoneAlt, FaUser, FaCreditCard, FaCoins } from 'react-icons/fa';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { useHybridRead } from '../../services/useHybridRead.js';
+import '../../components/ui/history-modal.css';
 
 const BRAND = '#0e6ba8';
 
@@ -16,6 +18,8 @@ export function CrmPage() {
   const [filter, setFilter] = useState('all'); // 'all' | 'credit'
   const [selectedClient, setSelectedClient] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyContentRef = useRef(null);
 
   const localClients = useQuery(queryClients(currentShop?.id || '')) || [];
   const localSales = useQuery(querySales(currentShop?.id || '')) || [];
@@ -69,6 +73,19 @@ export function CrmPage() {
   const totalClients = clientStats.length;
   const clientsWithDebt = clientStats.filter(c => c.resteAPayer > 0).length;
   const totalDebt = clientStats.reduce((sum, c) => sum + c.resteAPayer, 0);
+  const activeClient = selectedClient ? clientStats.find(client => client.id === selectedClient.id) : null;
+  const historyPageSize = 8;
+  const historyPages = Math.max(1, Math.ceil((activeClient?.sales.length || 0) / historyPageSize));
+  useEffect(() => { setHistoryPage(1); }, [selectedClient?.id]);
+  useEffect(() => { historyContentRef.current?.scrollTo({ top: 0 }); }, [historyPage]);
+  useEffect(() => {
+    if (!activeClient) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = event => { if (event.key === 'Escape') setSelectedClient(null); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', onKeyDown); };
+  }, [activeClient?.id]);
 
   if (!currentShop) return <div style={{ padding: '20px' }}>Chargement...</div>;
 
@@ -172,29 +189,18 @@ export function CrmPage() {
       </div>
       <Pagination page={currentPage} totalPages={totalPages} totalItems={filteredClients.length} itemLabel="client" onPageChange={setCurrentPage} />
 
-      {/* Client Detail Bottom Sheet */}
-      {selectedClient && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }} onClick={() => setSelectedClient(null)}>
+      {activeClient && createPortal(
+        <div className="history-modal-overlay" onClick={() => setSelectedClient(null)}>
           <div 
             onClick={e => e.stopPropagation()}
-            style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              backgroundColor: 'var(--bg-surface)', borderRadius: '20px 20px 0 0', maxHeight: '88vh',
-              display: 'flex', flexDirection: 'column', boxShadow: '0 -10px 40px rgba(0,0,0,0.15)',
-              animation: 'slideUp 0.3s ease'
-            }}
+            className="history-modal-dialog" role="dialog" aria-modal="true" aria-label={`Historique de ${activeClient.name}`}
           >
-            {/* Handle bar */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0' }}>
-              <div style={{ width: '40px', height: '4px', borderRadius: '2px', backgroundColor: 'var(--text-muted)' }} />
-            </div>
-
             {/* Header */}
             <div style={{ padding: '12px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedClient.name}</h3>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)' }}>{activeClient.name}</h3>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                  <FaPhoneAlt size={10} /> {selectedClient.phone || 'Non renseigné'}
+                  <FaPhoneAlt size={10} /> {activeClient.phone || 'Non renseigné'}
                 </div>
               </div>
               <button onClick={() => setSelectedClient(null)} style={{ background: 'var(--bg-main)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -202,35 +208,35 @@ export function CrmPage() {
               </button>
             </div>
 
-            {/* Financial Summary */}
-            <div style={{ padding: '0 20px 16px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            <div className="history-modal-content" ref={historyContentRef}>
+            <div className="history-modal-summary" style={{ padding: '0 20px 16px', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px' }}>
               <div style={{ textAlign: 'center', padding: '12px 4px', backgroundColor: 'var(--bg-main)', borderRadius: '10px' }}>
                 <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>{t('clients_page.total_bought')}</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{selectedClient.totalBought.toLocaleString('fr-FR')} F</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{activeClient.totalBought.toLocaleString('fr-FR')} F</div>
               </div>
               <div style={{ textAlign: 'center', padding: '12px 4px', backgroundColor: '#f0fdf4', borderRadius: '10px' }}>
                 <div style={{ fontSize: '0.6rem', color: '#065f46', fontWeight: 600, textTransform: 'uppercase' }}>{t('clients_page.paid')}</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#16a34a', marginTop: '2px' }}>{selectedClient.totalPaid.toLocaleString('fr-FR')} F</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#16a34a', marginTop: '2px' }}>{activeClient.totalPaid.toLocaleString('fr-FR')} F</div>
               </div>
-              <div style={{ textAlign: 'center', padding: '12px 4px', backgroundColor: selectedClient.resteAPayer > 0 ? '#fef2f2' : 'var(--bg-main)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '0.6rem', color: selectedClient.resteAPayer > 0 ? '#dc2626' : 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>{t('clients_page.remaining')}</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: selectedClient.resteAPayer > 0 ? '#dc2626' : 'var(--text-primary)', marginTop: '2px' }}>{selectedClient.resteAPayer.toLocaleString('fr-FR')} F</div>
+              <div style={{ textAlign: 'center', padding: '12px 4px', backgroundColor: activeClient.resteAPayer > 0 ? '#fef2f2' : 'var(--bg-main)', borderRadius: '10px' }}>
+                <div style={{ fontSize: '0.6rem', color: activeClient.resteAPayer > 0 ? '#dc2626' : 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>{t('clients_page.remaining')}</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: activeClient.resteAPayer > 0 ? '#dc2626' : 'var(--text-primary)', marginTop: '2px' }}>{activeClient.resteAPayer.toLocaleString('fr-FR')} F</div>
               </div>
             </div>
 
             {/* Purchase History */}
             <div style={{ padding: '8px 20px', borderTop: '1px solid var(--border-color)' }}>
-              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>Historique ({selectedClient.sales.length})</h4>
+              <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>Historique ({activeClient.sales.length})</h4>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px' }}>
-              {selectedClient.sales.length === 0 ? (
+            <div style={{ padding: '0 20px 20px' }}>
+              {activeClient.sales.length === 0 ? (
                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>{t('clients_page.no_purchase')}</div>
               ) : (
-                selectedClient.sales.map((sale, i) => {
+                activeClient.sales.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize).map((sale) => {
                   const product = products.find(p => p.id === (sale.productId || sale.product_id));
                   const isCredit = String(sale.paymentMethod || sale.payment_method || '').toLowerCase() === 'credit';
                   return (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
+                    <div key={sale.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-color)' }}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {product?.name || 'Produit'}
@@ -251,16 +257,11 @@ export function CrmPage() {
                 })
               )}
             </div>
+            </div>
+            <div className="history-modal-footer"><Pagination page={historyPage} totalPages={historyPages} totalItems={activeClient.sales.length} itemLabel="vente" onPageChange={setHistoryPage} /></div>
           </div>
-        </div>
+        </div>, document.body
       )}
-
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

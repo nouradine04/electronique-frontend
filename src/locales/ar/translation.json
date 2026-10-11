@@ -4,7 +4,7 @@
     "pos": "نقطة البيع",
     "stock": "المخزون",
     "invoices": "الفواتير",
-    "transactions": "المعاملات",
+    "transactions": "المبيعات",
     "sales": "المبيعات",
     "team": "المستخدمون",
     "products": "المنتجات",
@@ -26,7 +26,7 @@
     "home": "الرئيسية",
     "stock": "المخزون",
     "sales": "المبيعات",
-    "transactions": "المعاملات",
+    "transactions": "المبيعات",
     "team": "المستخدمون",
     "products": "المنتجات",
     "more": "المزيد",
@@ -108,7 +108,7 @@
     "product": "المنتج"
   },
   "transactions_page": {
-    "title": "المعاملات",
+    "title": "المبيعات",
     "subtitle": "سجل مبيعات المدير",
     "total_collected": "إجمالي المحصّل",
     "num_sales": "عدد المبيعات",
@@ -129,7 +129,7 @@
     "amount": "المبلغ",
     "payment": "الدفع",
     "date": "التاريخ",
-    "no_transaction": "لا توجد معاملات"
+    "no_transaction": "لا توجد مبيعات"
   },
   "settings_page": {
     "title": "الإعدادات",

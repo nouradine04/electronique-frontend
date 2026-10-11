@@ -1,7 +1,7 @@
 import { AutomaticAppUpdates } from './components/AutomaticAppUpdates';
 import React, { useState } from 'react';
 import { isInstalledApp } from './services/appMode';
-import { LoadingScreen } from './components/ui/LoadingScreen';
+import { LoadingIndicator, LoadingScreen } from './components/ui/LoadingScreen';
 import { ShopProvider, useShop } from './context/ShopContext.jsx';
 import { SyncProvider } from './context/SyncContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
@@ -32,7 +32,6 @@ const ProfitPage = lazyPage(() => import('./pages/admin/ProfitPage.jsx'), 'Profi
 const TransactionsPage = lazyPage(() => import('./pages/admin/TransactionsPage.jsx'), 'TransactionsPage');
 const CrmPage = lazyPage(() => import('./pages/admin/CrmPage.jsx'), 'CrmPage');
 const TeamPage = lazyPage(() => import('./pages/admin/TeamPage.jsx'), 'TeamPage');
-const PlatformPage = lazyPage(() => import('./pages/platform/PlatformPage.jsx'), 'PlatformPage');
 
 function MainAppContent() {
   const { currentShop, userRole, isInitialized, hasValidLocalSession, logout } = useShop();
@@ -166,7 +165,7 @@ function MainAppContent() {
 
         {/* Dynamic Page Views */}
         <main style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-          <React.Suspense fallback={<div role="status">Chargement de l’écran…</div>}>
+          <React.Suspense fallback={<LoadingIndicator />}>
           
           {activeTab === 'add' && (
             <CatalogManagementPage />
@@ -242,10 +241,6 @@ export default function App() {
     document.documentElement.classList.toggle('installed-app', installed);
     return () => document.documentElement.classList.remove('installed-app');
   }, []);
-
-  if (window.location.pathname.startsWith('/platform')) {
-    return <React.Suspense fallback={<LoadingScreen />}><PlatformPage /></React.Suspense>;
-  }
 
   return (
       <ToastProvider>

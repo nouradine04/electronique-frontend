@@ -23,9 +23,10 @@ test('server rows replace stale synced copies while pending local writes remain 
   assert.equal(combineHybridRows(local, remote, false), local);
 });
 
-test('only connectivity and server failures may fall back; authorization never does', () => {
+test('connectivity and unavailable read routes fall back; authorization never does', () => {
   assert.equal(hybridFailureMode({ name: 'NetworkError' }), 'fallback');
   assert.equal(hybridFailureMode({ status: 503 }), 'fallback');
+  assert.equal(hybridFailureMode({ status: 404 }), 'fallback');
   assert.equal(hybridFailureMode({ status: 401 }), 'error');
   assert.equal(hybridFailureMode({ status: 403 }), 'error');
   assert.equal(hybridFailureMode({ status: 400 }), 'error');

@@ -3,12 +3,11 @@ import { Pagination } from '../../components/ui/Pagination.jsx';
 import { usePagination } from '../../components/ui/usePagination.js';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '../../db/useQuery.js';
-import { createExpense, queryCategories, queryExpenses, queryProducts, queryReturns, querySales } from '../../db/queries.js';
+import { queryCategories, queryProducts, queryReturns, querySales } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
-import { useToast } from '../../context/ToastContext.jsx';
-import { ExpenseModal, EXPENSE_CATEGORY_LABELS } from '../../components/finance/ExpenseModal.jsx';
+import { useHybridRead } from '../../services/useHybridRead.js';
 import { FaChevronRight, FaSearch, FaTimes } from 'react-icons/fa';
-import { Plus, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
@@ -32,45 +31,44 @@ const saleTotal = sale => Number(sale.totalPrice || sale.total_price || 0);
 
 export function ProfitPage() {
   const { t } = useTranslation();
-  const { currentShop, userName } = useShop();
-  const { showToast } = useToast();
+  const { currentShop } = useShop();
   const [timeFilter, setTimeFilter] = useState('month');
   const [search, setSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
-
-  const products = useQuery(currentShop ? queryProducts(currentShop.id) : null, [currentShop?.id]) || [];
-  const sales = useQuery(currentShop ? querySales(currentShop.id) : null, [currentShop?.id]) || [];
-  const categories = useQuery(currentShop ? queryCategories(currentShop.id) : null, [currentShop?.id]) || [];
-  const returns = useQuery(currentShop ? queryReturns(currentShop.id) : null, [currentShop?.id]) || [];
-  const expenses = useQuery(currentShop ? queryExpenses(currentShop.id) : null, [currentShop?.id]) || [];
+  const localProducts = useQuery(currentShop ? queryProducts(currentShop.id) : null, [currentShop?.id]) || [];
+  const localSales = useQuery(currentShop ? querySales(currentShop.id) : null, [currentShop?.id]) || [];
+  const localCategories = useQuery(currentShop ? queryCategories(currentShop.id) : null, [currentShop?.id]) || [];
+  const localReturns = useQuery(currentShop ? queryReturns(currentShop.id) : null, [currentShop?.id]) || [];
+  const products = useHybridRead('products', currentShop?.id, localProducts).records;
+  const sales = useHybridRead('sales', currentShop?.id, localSales).records;
+  const categories = useHybridRead('categories', currentShop?.id, localCategories).records;
+  const returns = useHybridRead('returns', currentShop?.id, localReturns).records;
 
   const salesById = useMemo(() => new Map(sales.map(sale => [sale.id, sale])), [sales]);
   const productsById = useMemo(() => new Map(products.map(product => [product.id, product])), [products]);
-  const costForSale = sale => Number(sale?.unitCost || sale?.unit_cost || productsById.get(saleProductId(sale))?.unitCost || 0);
+  const costForSale = sale => Number(sale?.unitCost ?? sale?.unit_cost ?? productsById.get(saleProductId(sale))?.unitCost ?? productsById.get(saleProductId(sale))?.unit_cost ?? 0);
 
   const filteredSales = sales.filter(item => isInPeriod(item.date, timeFilter));
   const filteredReturns = returns.filter(item => isInPeriod(item.date, timeFilter));
-  const filteredExpenses = expenses.filter(item => isInPeriod(item.date, timeFilter));
 
   const grossRevenue = filteredSales.reduce((sum, sale) => sum + saleTotal(sale), 0);
-  const refunds = filteredReturns.reduce((sum, item) => sum + Number(item.refundAmount || 0), 0);
+  const refunds = filteredReturns.reduce((sum, item) => sum + Number(item.refundAmount || item.refund_amount || 0), 0);
   const periodRevenue = grossRevenue - refunds;
   const soldCost = filteredSales.reduce((sum, sale) => sum + costForSale(sale) * Number(sale.quantity || 0), 0);
   const recoveredCost = filteredReturns
     .filter(item => item.restock)
-    .reduce((sum, item) => sum + costForSale(salesById.get(item.saleId)) * Number(item.quantity || 0), 0);
-  const operatingExpenses = filteredExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const periodProfit = periodRevenue - (soldCost - recoveredCost) - operatingExpenses;
-  const totalInvestment = products.reduce((sum, product) => sum + Number(product.unitCost || 0) * Number(product.quantity || 0), 0);
+    .reduce((sum, item) => sum + costForSale(salesById.get(item.saleId || item.sale_id)) * Number(item.quantity || 0), 0);
+  const periodProfit = periodRevenue - (soldCost - recoveredCost);
+  const totalInvestment = products.reduce((sum, product) => sum + Number(product.unitCost || product.unit_cost || 0) * Number(product.quantity || 0), 0);
 
   const returnsByProduct = useMemo(() => {
     const result = new Map();
     returns.forEach(item => {
-      const current = result.get(item.productId) || { quantity: 0, refund: 0 };
+      const productId = item.productId || item.product_id;
+      const current = result.get(productId) || { quantity: 0, refund: 0 };
       current.quantity += Number(item.quantity || 0);
-      current.refund += Number(item.refundAmount || 0);
-      result.set(item.productId, current);
+      current.refund += Number(item.refundAmount || item.refund_amount || 0);
+      result.set(productId, current);
     });
     return result;
   }, [returns]);
@@ -78,7 +76,7 @@ export function ProfitPage() {
   const productProfitability = useMemo(() => products
     .filter(product => Number(product.price || 0) > 0)
     .map(product => {
-      const cost = Number(product.unitCost || 0);
+      const cost = Number(product.unitCost || product.unit_cost || 0);
       const price = Number(product.price || 0);
       const marginValue = price - cost;
       const marginPercent = cost > 0 ? (marginValue / cost) * 100 : 0;
@@ -108,21 +106,19 @@ export function ProfitPage() {
       const end = new Date(month.getFullYear(), month.getMonth() + 1, 1);
       const monthSales = sales.filter(item => new Date(item.date) >= start && new Date(item.date) < end);
       const monthReturns = returns.filter(item => new Date(item.date) >= start && new Date(item.date) < end);
-      const monthExpenses = expenses.filter(item => new Date(item.date) >= start && new Date(item.date) < end);
-      const monthRevenue = monthSales.reduce((sum, sale) => sum + saleTotal(sale), 0) - monthReturns.reduce((sum, item) => sum + Number(item.refundAmount || 0), 0);
+      const monthRevenue = monthSales.reduce((sum, sale) => sum + saleTotal(sale), 0) - monthReturns.reduce((sum, item) => sum + Number(item.refundAmount || item.refund_amount || 0), 0);
       const monthSoldCost = monthSales.reduce((sum, sale) => sum + costForSale(sale) * Number(sale.quantity || 0), 0);
-      const monthRecoveredCost = monthReturns.filter(item => item.restock).reduce((sum, item) => sum + costForSale(salesById.get(item.saleId)) * Number(item.quantity || 0), 0);
-      const monthExpensesTotal = monthExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const monthRecoveredCost = monthReturns.filter(item => item.restock).reduce((sum, item) => sum + costForSale(salesById.get(item.saleId || item.sale_id)) * Number(item.quantity || 0), 0);
 
       labels.push(monthNames[month.getMonth()]);
       revenue.push(monthRevenue);
-      profit.push(monthRevenue - (monthSoldCost - monthRecoveredCost) - monthExpensesTotal);
+      profit.push(monthRevenue - (monthSoldCost - monthRecoveredCost));
     }
     return { labels, datasets: [
       { label: 'CA net', data: revenue, backgroundColor: BRAND, borderRadius: 4 },
-      { label: 'Bénéfice net', data: profit, backgroundColor: '#16a34a', borderRadius: 4 },
+      { label: 'Marge produits', data: profit, backgroundColor: '#16a34a', borderRadius: 4 },
     ] };
-  }, [sales, returns, expenses, productsById, salesById]);
+  }, [sales, returns, productsById, salesById]);
 
   const productHistory = useMemo(() => {
     if (!selectedProduct) return [];
@@ -135,21 +131,10 @@ export function ProfitPage() {
         quantity: sale.quantity,
         total: saleTotal(sale),
         method: sale.paymentMethod || sale.payment_method,
-        returned: returns.filter(item => item.saleId === sale.id).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+        returned: returns.filter(item => (item.saleId || item.sale_id) === sale.id).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
       }));
   }, [selectedProduct, sales, returns]);
 
-  const addExpense = async values => {
-    try {
-      await createExpense({ ...values, shop_id: currentShop.id, created_by: userName });
-      setShowExpenseModal(false);
-      showToast('Dépense enregistrée dans la comptabilité.', 'success');
-    } catch (error) {
-      showToast(error.message || 'Impossible d’enregistrer la dépense.', 'danger');
-    }
-  };
-
-  const expensePage = usePagination([...filteredExpenses].sort((a, b) => new Date(b.date) - new Date(a.date)), `${currentShop?.id}:${timeFilter}`, 6);
   const marginPage = usePagination(productProfitability, `${currentShop?.id}:${search}`);
 
   if (!currentShop) return <div style={{ padding: '24px' }}>Veuillez sélectionner une boutique.</div>;
@@ -165,42 +150,21 @@ export function ProfitPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{t('profit_page.title')}</h2>
-          <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: '14px' }}>Ventes, retours, coût du stock et charges de {currentShop.name}</p>
+          <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: '14px' }}>Marge des produits vendus dans {currentShop.name}</p>
         </div>
-        <button onClick={() => setShowExpenseModal(true)} style={{ minHeight: '44px', padding: '0 16px', border: 0, borderRadius: '10px', background: BRAND, color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}><Plus size={18} /> Ajouter une dépense</button>
       </div>
 
       <label className="profit-period">Période<select value={timeFilter} onChange={event => setTimeFilter(event.target.value)}><option value="month">Ce mois</option><option value="year">Cette année</option><option value="all">Depuis le début</option></select></label>
       <section className="profit-summary" aria-label="Résultat de la période">
-        <div className="profit-result"><small>{periodProfit < 0 ? 'Perte sur la période' : 'Bénéfice sur la période'}</small><strong>{money(periodProfit)}</strong><p>Après coûts d’achat, remboursements et dépenses.</p></div>
-        <dl className="profit-breakdown"><div><dt>Ventes après remboursements</dt><dd>{money(periodRevenue)}</dd></div><div><dt>Coût des produits vendus</dt><dd>{money(soldCost - recoveredCost)}</dd></div><div><dt>Dépenses de la boutique</dt><dd>{money(operatingExpenses)}</dd></div></dl>
-        <p className="profit-explanation">Les ventes à crédit sont incluses : ce résultat n’est pas l’argent disponible en caisse.</p>
+        <div className="profit-result"><small>{periodProfit < 0 ? 'Perte sur les produits' : 'Marge des produits vendus'}</small><strong>{money(periodProfit)}</strong><p>Prix de vente moins coût d’achat, retours pris en compte.</p></div>
+        <dl className="profit-breakdown"><div><dt>Ventes après remboursements</dt><dd>{money(periodRevenue)}</dd></div><div><dt>Coût des produits vendus</dt><dd>{money(soldCost - recoveredCost)}</dd></div></dl>
+        <p className="profit-explanation">Marge commerciale estimée, sans les autres charges. Les ventes à crédit sont incluses.</p>
       </section>
       <p className="profit-stock-note">Valeur du stock actuel au coût d’achat : <strong>{money(totalInvestment)}</strong></p>
       <details className="profit-details">
         <summary>Voir l’évolution sur 12 mois</summary>
         <div className="profit-chart"><Bar data={monthlyData} options={chartOptions} /></div>
       </details>
-
-      <section style={{ padding: '18px', borderRadius: '12px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
-          <div>
-            <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '16px' }}>Dépenses récentes</h3>
-            <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: '12px' }}>Loyers, salaires et autres frais de fonctionnement</p>
-          </div>
-          <span style={{ color: '#dc2626', fontWeight: 800, fontSize: '14px' }}>{money(operatingExpenses)}</span>
-        </div>
-        {filteredExpenses.length ? expensePage.items.map(expense => (
-          <div key={expense.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '11px 0', borderTop: '1px solid var(--border-color)' }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.description}</div>
-              <div style={{ marginTop: '3px', color: 'var(--text-secondary)', fontSize: '11px' }}>{EXPENSE_CATEGORY_LABELS[expense.category] || expense.category} · {new Date(expense.date).toLocaleDateString('fr-FR')}{expense.employeeName ? ` · ${expense.employeeName}` : ''}{expense.recurrence === 'MONTHLY' ? ' · mensuelle' : ''}</div>
-            </div>
-            <strong style={{ color: '#dc2626', whiteSpace: 'nowrap', fontSize: '13px' }}>− {money(expense.amount)}</strong>
-          </div>
-        )) : <div style={{ padding: '20px 0 4px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>Aucune dépense sur cette période.</div>}
-        <Pagination {...expensePage.props} itemLabel="dépense" />
-      </section>
 
       <details className="profit-details"><summary>Consulter les marges par produit</summary><p className="profit-detail-note">Prix actuels et historique depuis le début. La marge par unité ne déduit pas les dépenses de la boutique.</p>
       <div style={{ position: 'relative' }}>
@@ -255,7 +219,6 @@ export function ProfitPage() {
         </div>
       )}
 
-      {showExpenseModal && <ExpenseModal onClose={() => setShowExpenseModal(false)} onSubmit={addExpense} />}
 
       <style>{`@media (max-width: 520px) { .profit-kpis { grid-template-columns: 1fr !important; } }`}</style>
     </div>

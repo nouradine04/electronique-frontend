@@ -18,6 +18,6 @@ export function combineHybridRows(localRows, remoteRows, useRemote) {
 }
 
 export function hybridFailureMode(error) {
-  if (error?.name === 'NetworkError' || error?.status >= 500) return 'fallback';
+  if (error?.name === 'NetworkError' || error?.status === 404 || error?.status === 405 || error?.status >= 500) return 'fallback';
   return 'error';
 }

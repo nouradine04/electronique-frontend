@@ -2,15 +2,13 @@ import { useExactUnitMatch, useUnitProductMatches } from '../../components/stock
 import React, { useState, useEffect, useRef } from 'react';
 import { normalizeIdentifierSearch } from '../../services/productUnits';
 import { useQuery, useQueryState } from '../../db/useQuery.js';
-import { queryProducts, queryCategories, queryStockMovements, updateProduct } from '../../db/queries.js';
+import { queryProducts, queryCategories, queryStockMovements } from '../../db/queries.js';
 import { useShop } from '../../context/ShopContext.jsx';
 import { useSync } from '../../context/SyncContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { recordStockMovement } from '../../services/syncEngine.js';
 import { StockMovementModal } from '../../components/stock/StockMovementModal.jsx';
-import { AddProductWizard } from '../../components/stock/AddProductWizard.jsx';
 import { ProductDetailPage } from '../common/ProductDetailPage.jsx';
-import { attachProductPhotoAfterSave } from '../../services/productPhotoAfterSave.js';
 import { useHybridRead } from '../../services/useHybridRead.js';
 import {
   Search,
@@ -45,7 +43,6 @@ export function ManagerStockPage() {
   useEffect(() => { setCurrentPage(1); }, [searchQuery, selectedCategory, statusFilter, movementType, activeView, currentShop?.id]);
 
   const [movementModal, setMovementModal] = useState({ open: false, product: null, type: 'OUT' });
-  const [productFormModal, setProductFormModal] = useState({ open: false, product: null });
 
   const [selectedProductId, setSelectedProductId] = useState(null);
   useEffect(() => {
@@ -80,11 +77,11 @@ export function ManagerStockPage() {
     
     const matchesSearch = unitMatches.has(product.id) || nameStr.includes(q) || skuStr.includes(q) || locStr.includes(q);
 
-    const matchesCategory = selectedCategory === 'ALL' || product.category_id === selectedCategory;
+    const matchesCategory = selectedCategory === 'ALL' || (product.categoryId || product.category_id) === selectedCategory;
 
     let matchesStatus = true;
     if (statusFilter === 'PENDING') matchesStatus = product.status === 'PENDING_PRICE';
-    if (statusFilter === 'LOW') matchesStatus = product.status !== 'PENDING_PRICE' && product.quantity <= product.min_stock && product.quantity > 0;
+    if (statusFilter === 'LOW') matchesStatus = product.status !== 'PENDING_PRICE' && product.quantity <= (product.minStock ?? product.min_stock ?? 5) && product.quantity > 0;
     if (statusFilter === 'OUT') matchesStatus = product.status !== 'PENDING_PRICE' && product.quantity === 0;
 
     return unitMatches.has(product.id) || (matchesSearch && matchesCategory && matchesStatus);
@@ -126,34 +123,6 @@ export function ManagerStockPage() {
     }
   };
 
-  const handleSaveProduct = async (productData, photoFile) => {
-    try {
-      const currentProduct = products.find(product => product.id === productData.id);
-      if (!currentProduct) throw new Error('Produit introuvable.');
-      const requestedQuantity = Number(productData.quantity || 0);
-      const saved = await updateProduct(currentProduct, {
-        ...productData,
-        quantity: currentProduct.quantity,
-      });
-      if (requestedQuantity !== Number(currentProduct.quantity || 0)) {
-        await recordStockMovement({
-          shop_id: currentShop.id,
-          product_id: currentProduct.id,
-          product_name: currentProduct.name,
-          type: 'ADJUST',
-          quantity: requestedQuantity,
-          reason: 'Correction depuis la fiche produit',
-          user_name: userName,
-        });
-      }
-      const photoWarning = await attachProductPhotoAfterSave(saved, photoFile, currentShop.id);
-      showToast(photoWarning || 'Composant mis à jour.', photoWarning ? 'warning' : 'success');
-      setProductFormModal({ open: false, product: null });
-    } catch (err) {
-      throw err;
-    }
-  };
-
   // Metrics summary
   const lowStockCount = products.filter(p => p.status !== 'PENDING_PRICE' && p.quantity <= (p.minStock || 5) && p.quantity > 0).length;
   const outOfStockCount = products.filter(p => p.status !== 'PENDING_PRICE' && p.quantity === 0).length;
@@ -171,7 +140,6 @@ export function ManagerStockPage() {
 
       <header className="ms-heading"><div><h2>Stock</h2><p>{currentShop?.name} · inventaire de la boutique</p></div></header>
       <div className="ms-overview" aria-label="Résumé du stock">
-        <button type="button" onClick={() => { setActiveView('inventory'); setStatusFilter('ALL'); }}><span>Produits</span><strong>{products.length}</strong></button>
         <div><span>Unités disponibles</span><strong>{totalUnits}</strong></div>
         <button type="button" className="low" onClick={() => { setActiveView('inventory'); setStatusFilter('LOW'); }}><span>Stock faible</span><strong>{lowStockCount}</strong></button>
         <button type="button" className="alert" onClick={() => { setActiveView('inventory'); setStatusFilter('OUT'); }}><span>Ruptures</span><strong>{outOfStockCount}</strong></button>
@@ -225,7 +193,7 @@ export function ManagerStockPage() {
         </div>
 
         {activeView === 'inventory'
-          ? productRead.loading || productQuery.loading || initialPullPending && !products.length ? <p role="status" style={{ padding: 24 }}>Chargement des produits…</p> : <ManagerStockList products={paginatedProducts} onView={setSelectedProductId} onMovement={(product, type) => setMovementModal({ open: true, product, type })} onEdit={product => setProductFormModal({ open: true, product })} />
+          ? productRead.loading || productQuery.loading || initialPullPending && !products.length ? <p role="status" style={{ padding: 24 }}>Chargement des produits…</p> : <ManagerStockList products={paginatedProducts} onView={setSelectedProductId} onMovement={(product, type) => setMovementModal({ open: true, product, type })} />
           : <ManagerStockJournal movements={paginatedMovements} productsById={productsById} />}
 
         {/* Pagination Footer */}
@@ -261,15 +229,6 @@ export function ManagerStockPage() {
           defaultType={movementModal.type}
           onClose={() => setMovementModal({ open: false, product: null, type: 'OUT' })}
           onSubmit={handleExecuteMovement}
-        />
-      )}
-
-      {productFormModal.open && (
-        <AddProductWizard
-          initialData={productFormModal.product}
-          categories={categories}
-          onClose={() => { setProductFormModal({ open: false, product: null }); }}
-          onSubmit={handleSaveProduct}
         />
       )}
 

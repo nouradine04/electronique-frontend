@@ -1,8 +1,8 @@
 import React from 'react';
-import { Package, Eye, Plus, Minus, Pencil, MapPin } from 'lucide-react';
+import { Package, Plus, Minus, MapPin } from 'lucide-react';
 import { LocalImage } from '../common/LocalImage.jsx';
 
-export function ManagerStockList({ products, onView, onMovement, onEdit }) {
+export function ManagerStockList({ products, onView, onMovement }) {
   if (products.length === 0) return <div className="ms-empty"><Package size={28} /><strong>Aucun produit trouvé</strong><span>Modifiez la recherche ou les filtres.</span></div>;
 
   return <div className="ms-inventory" role="table" aria-label="État du stock">
@@ -25,8 +25,6 @@ export function ManagerStockList({ products, onView, onMovement, onEdit }) {
       <div className="ms-row-actions" role="cell">
         <button className="ms-movement in" title="Enregistrer une entrée" aria-label={`Ajouter une entrée pour ${product.name}`} onClick={() => onMovement(product, 'IN')}><Plus size={16} /><span>Entrée</span></button>
         <button className="ms-movement out" title="Enregistrer une sortie" aria-label={`Ajouter une sortie pour ${product.name}`} onClick={() => onMovement(product, 'OUT')} disabled={Number(product.quantity || 0) === 0}><Minus size={16} /><span>Sortie</span></button>
-        <button className="ms-icon-action" onClick={() => onView(product.id)} aria-label={`Détails de ${product.name}`}><Eye size={17} /></button>
-        <button className="ms-icon-action" onClick={() => onEdit(product)} aria-label={`Modifier ${product.name}`}><Pencil size={17} /></button>
       </div>
     </article>;
   })}</div>;

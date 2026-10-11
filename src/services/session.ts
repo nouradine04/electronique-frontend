@@ -2,9 +2,9 @@ import { BACKEND_URL } from '../context/backendConfig';
 
 export type SessionState = { userId: string; offlineAccessUntil: string; api: string; blocked?: boolean };
 type SessionResponse = { access_token: string; offline_access_until: string; user_id: string; refresh_token?: string; user?: { id: string }; shop?: { id: string } };
-export class SessionError extends Error { constructor(message = 'Session expirée. Reconnexion requise.') { super(message); } }
-export class NetworkError extends Error { constructor(message = 'Serveur injoignable. Vérifiez votre connexion ou réessayez plus tard.') { super(message); } }
-export class ApiError extends Error { constructor(public status: number, message: string, public details?: unknown) { super(message); } }
+export class SessionError extends Error { constructor(message = 'Session expirée. Reconnexion requise.') { super(message); this.name = 'SessionError'; } }
+export class NetworkError extends Error { constructor(message = 'Serveur injoignable. Vérifiez votre connexion ou réessayez plus tard.') { super(message); this.name = 'NetworkError'; } }
+export class ApiError extends Error { constructor(public status: number, message: string, public details?: unknown) { super(message); this.name = 'ApiError'; } }
 let accessToken = '';
 let refreshing: Promise<string> | null = null;
 let recovering: Promise<SessionResponse> | null = null;

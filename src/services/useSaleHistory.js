@@ -23,6 +23,8 @@ function saleFromServer(row) {
     productName: row.product_name || '',
     clientName: row.client_name || '',
     clientPhone: row.client_phone || '',
+    productDetails: row.product_details || '',
+    unitIdentifiers: row.unit_identifiers || [],
     remoteOnly: true,
   };
 }

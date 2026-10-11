@@ -25,7 +25,7 @@
 .ms-search .input-field { padding-left: 39px; }
 .ms-toolbar select { min-width: 155px; }
 .ms-inventory { width: 100%; }
-.ms-inventory-head, .ms-inventory-row { display: grid; grid-template-columns: minmax(240px, 2fr) minmax(120px, .9fr) 100px 120px minmax(250px, 1.25fr); align-items: center; column-gap: 18px; }
+.ms-inventory-head, .ms-inventory-row { display: grid; grid-template-columns: minmax(240px, 2fr) minmax(120px, .9fr) 100px 120px minmax(180px, 1fr); align-items: center; column-gap: 18px; }
 .ms-inventory-head { min-height: 42px; padding: 0 16px; background: var(--bg-main); color: var(--text-muted); border-bottom: 1px solid var(--border-color); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .035em; }
 .ms-inventory-row { min-height: 68px; padding: 7px 16px; border-bottom: 1px solid var(--border-color); }
 .ms-inventory-row:last-child { border-bottom: 0; }
@@ -100,8 +100,11 @@
   .ms-heading p { font-size: 12px; }
   .ms-add { width: 44px; padding: 0; justify-content: center; }
   .ms-add span { display: none; }
-  .ms-overview { overflow-x: auto; scrollbar-width: none; }
-  .ms-overview button, .ms-overview div { flex: 0 0 106px; padding: 11px 12px; }
+  .ms-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; }
+  .ms-overview button, .ms-overview div { min-width: 0; padding: 11px 12px; border-bottom: 1px solid var(--border-color); }
+  .ms-overview > :nth-child(even) { border-right: 0; }
+  .ms-overview > :nth-child(n+3) { border-bottom: 0; }
+  .ms-overview > :nth-child(odd):last-child { grid-column: 1 / -1; border-right: 0; }
   .ms-overview strong { font-size: 17px; }
   .ms-toolbar { grid-template-columns: 1fr 1fr; padding: 12px; }
   .ms-search { grid-column: 1 / -1; }
@@ -119,14 +122,13 @@
   .ms-movement { width: 34px; min-height: 34px !important; padding: 0; justify-content: center; }
   .ms-movement span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
   .ms-icon-action { width: 34px; min-height: 34px !important; }
-  .ms-row-actions .ms-icon-action:first-of-type { display: none; }
   .ms-pagination > span:first-child { display: none; }
   .ms-pagination { justify-content: center; }
   .ms-view-tabs { gap: 18px; }
   .ms-journal-row { min-height: 94px; }
 }
 @media (max-width: 370px) {
-  .ms-row-actions { display: grid; grid-template-columns: 1fr 1fr 44px 44px; }
+  .ms-row-actions { display: flex; }
   .ms-item-image { width: 38px; height: 46px; }
   .ms-status-cell small { display: none; }
 }

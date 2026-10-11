@@ -70,7 +70,7 @@ export function BottomNav({ activeTab, setActiveTab }) {
   ];
   const managerMoreTabs = [
     { id: 'transactions', icon: History, label: t('bottom_nav.sales') },
-    { id: 'add', icon: PackagePlus, label: 'Catalogue' },
+    { id: 'add', icon: PackagePlus, label: t('bottom_nav.products') },
     { id: 'manager-clients', icon: Users, label: t('bottom_nav.clients') },
     { id: 'invoices', icon: FileText, label: t('bottom_nav.invoices') },
     { id: 'settings', icon: Settings, label: 'Profil et réglages' },
