@@ -1,3 +1,4 @@
+import { seoPlugin } from './scripts/seo.mjs';
 import { prepareOcrAssets } from './scripts/ocr-assets.mjs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -8,6 +9,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   plugins: [
+    seoPlugin(),
     { name: 'local-ocr-assets', buildStart: prepareOcrAssets },
     VitePWA({
       manifest: false,
@@ -20,6 +22,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         globIgnores: ['**/ocr/**'],
         navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/(?:app|platform)(?:\/|$)/, /^\/(?:robots\.txt|sitemap\.xml)$/],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         runtimeCaching: [

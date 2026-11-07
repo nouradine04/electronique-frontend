@@ -133,7 +133,7 @@ export function FeaturesSection({ isRtl }) {
                 key={active}
                 className={`feature-slide${feature.visual === 'offline' ? ' feature-slide-offline' : ''}`}
                 custom={direction}
-                initial={reducedMotion ? false : ({ x: 40 * direction, y: 20, opacity: 0, scale: 0.985 })}
+                initial={typeof window === 'undefined' || reducedMotion ? false : ({ x: 40 * direction, y: 20, opacity: 0, scale: 0.985 })}
                 animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
                 exit={reducedMotion ? undefined : ({ x: -40 * direction, opacity: 0, scale: 0.985 })}
                 transition={{ duration: reducedMotion ? 0 : 0.38, ease: [0.2, 0.7, 0.2, 1] }}

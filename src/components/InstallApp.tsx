@@ -5,7 +5,7 @@ import './install-app.css';
 type Device = 'desktop' | 'android' | 'ios';
 
 function desktopDownloadUrl() {
-  const ua = navigator.userAgent;
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
   if (/Windows/.test(ua)) return import.meta.env.VITE_WINDOWS_DOWNLOAD_URL;
   if (/Mac/.test(ua)) return import.meta.env.VITE_MACOS_DOWNLOAD_URL || '/downloads/NStock-macOS-Apple-Silicon.dmg';
   return import.meta.env.VITE_LINUX_DOWNLOAD_URL;
@@ -13,7 +13,7 @@ function desktopDownloadUrl() {
 
 export function InstallApp({ isRtl = false }: { isRtl?: boolean }) {
   const [selected, setSelected] = useState<Device>(() => {
-    const ua = navigator.userAgent;
+    const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
     if (/Android/.test(ua)) return 'android';
     if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
     return 'desktop';

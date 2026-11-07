@@ -28,7 +28,7 @@ export function BenefitsSection({ isRtl, lt, scrollToSection }) {
             <motion.article
               className="benefit-card"
               key={benefit.title}
-              initial={reducedMotion ? false : { opacity: 0, y: 36 }}
+              initial={typeof window === 'undefined' || reducedMotion ? false : { opacity: 0, y: 36 }}
               whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ duration: 0.55, delay: index * 0.09, ease: [0.2, 0.7, 0.2, 1] }}

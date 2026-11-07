@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 # Vite embeds these public values at build time. Never put secrets here.
+ARG VITE_SITE_URL=https://nstock.medaaris.com
 ARG VITE_BACKEND_URL
 ARG VITE_ENABLE_CLOUD_SYNC=true
 ARG VITE_GOOGLE_CLIENT_ID
